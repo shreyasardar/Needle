@@ -16,6 +16,10 @@ private:
 
     int totalDocumentLength = 0;
 
+    int totalDocuments = 0;
+
+    std::unordered_map<std::string, int> documentFrequency;
+
 public:
     void addDocument(
         int documentId,
@@ -24,8 +28,12 @@ public:
 
     std::vector<Posting> search(
         const std::string& word
-    );
+    ) const ;
 
-    int getDocumentLength(int documentId);
-    double getAverageDocumentLength();
+   int getDocumentLength(int documentId) const;
+double getAverageDocumentLength() const;
+int getDocumentFrequency(const std::string& word) const;
+    int getTotalDocuments() const;
+
+
 };

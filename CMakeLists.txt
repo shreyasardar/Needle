@@ -10,6 +10,7 @@ add_executable(needle
     src/DocumentLoader.cpp
     src/Tokenizer.cpp
     src/InvertedIndex.cpp
+    src/BM25.cpp
 )
 
 target_include_directories(needle PRIVATE include)

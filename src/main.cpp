@@ -4,6 +4,7 @@
 #include "DocumentLoader.h"
 #include "Tokenizer.h"
 #include "InvertedIndex.h"
+#include "BM25.h"
 
 int main() {
 
@@ -25,25 +26,23 @@ int main() {
         index.addDocument(doc.id, tokens);
 
         
-
-        
     }
 
-    std::vector<Posting> results =
-        index.search("computer");
+    BM25 bm25(index);
 
-    std::cout << "Documents containing 'computer':\n\n";
+    std::vector<SearchResult> results =
+    bm25.search("computer");
 
-    for (const Posting& posting : results) {
+    for (const SearchResult& result : results) {
 
-        std::cout << "Document ID: "
-                  << posting.documentId << '\n';
+    std::cout << "Document ID: "
+              << result.documentId << '\n';
 
-        std::cout << "Term Frequency: "
-                  << posting.termFrequency << '\n';
+    std::cout << "BM25 Score: "
+              << result.score << '\n';
 
-        std::cout << "-----------------------------\n";
-    }
+    std::cout << "-----------------------------\n";
+} 
 
     return 0;
 }

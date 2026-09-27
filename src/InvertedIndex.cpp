@@ -10,6 +10,10 @@ void InvertedIndex::addDocument(
     documentLengths[documentId] = tokens.size();
 
     totalDocumentLength += tokens.size();
+
+    totalDocuments++;
+
+
     averageDocumentLength =
     static_cast<double>(totalDocumentLength) /
     documentLengths.size();
@@ -27,6 +31,7 @@ void InvertedIndex::addDocument(
 
         const std::string& word = entry.first;
         int frequency = entry.second;
+        documentFrequency[word]++;
 
         Posting posting;
 
@@ -39,18 +44,33 @@ void InvertedIndex::addDocument(
 
 std::vector<Posting> InvertedIndex::search(
     const std::string& word
-) {
+) const {
     if (index.find(word) == index.end()) {
         return {};
     }
 
-    return index[word];
+    return index.at(word);
 }
 
-int InvertedIndex::getDocumentLength(int documentId) {
-    return documentLengths[documentId];
+int InvertedIndex::getDocumentLength(int documentId) const {
+    return documentLengths.at(documentId);
 }
 
-double InvertedIndex::getAverageDocumentLength() {
+double InvertedIndex::getAverageDocumentLength()const {
     return averageDocumentLength;
+}
+
+int InvertedIndex::getDocumentFrequency(
+    const std::string& word
+) const {
+    if (documentFrequency.find(word) ==
+        documentFrequency.end()) {
+        return 0;
+    }
+
+    return documentFrequency.at(word);
+}
+
+int InvertedIndex::getTotalDocuments() const {
+    return totalDocuments;
 }
