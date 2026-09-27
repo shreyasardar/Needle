@@ -1,19 +1,44 @@
 #include <iostream>
-#include "Document.h"
+#include <vector>
+
+#include "DocumentLoader.h"
+#include "Tokenizer.h"
+#include "InvertedIndex.h"
 
 int main() {
 
-    Document doc;
-
-    doc.id = 1;
-    doc.title = "Distributed Computing";
-    doc.text = "Distributed computing is a field of computer science.";
-
     std::cout << "Needle search engine starting...\n\n";
 
-    std::cout << "Document ID: " << doc.id << '\n';
-    std::cout << "Title: " << doc.title << '\n';
-    std::cout << "Text: " << doc.text << '\n';
+    // Load documents
+    DocumentLoader loader;
+
+    std::vector<Document> documents =
+        loader.load("data/corpus/documents.txt");
+
+    // Create tokenizer
+    Tokenizer tokenizer;
+
+    // Create inverted index
+    InvertedIndex index;
+
+    // Process every document
+    for (const Document& doc : documents) {
+
+        std::vector<std::string> tokens =
+            tokenizer.tokenize(doc.text);
+
+        index.addDocument(doc.id, tokens);
+    }
+
+    // Search the index
+    std::vector<int> results =
+        index.search("systems");
+
+    std::cout << "Documents containing 'computer':\n";
+
+    for (int documentId : results) {
+        std::cout << documentId << '\n';
+    }
 
     return 0;
 }

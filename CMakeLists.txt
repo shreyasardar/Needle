@@ -7,6 +7,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_executable(needle
     src/main.cpp
+    src/DocumentLoader.cpp
+    src/Tokenizer.cpp
+    src/InvertedIndex.cpp
 )
 
 target_include_directories(needle PRIVATE include)
