@@ -6,6 +6,14 @@ void InvertedIndex::addDocument(
     int documentId,
     const std::vector<std::string>& tokens
 ) {
+
+    documentLengths[documentId] = tokens.size();
+
+    totalDocumentLength += tokens.size();
+    averageDocumentLength =
+    static_cast<double>(totalDocumentLength) /
+    documentLengths.size();
+
     std::unordered_map<std::string, int> termFrequency;
 
     // Count how many times each word appears
@@ -37,4 +45,12 @@ std::vector<Posting> InvertedIndex::search(
     }
 
     return index[word];
+}
+
+int InvertedIndex::getDocumentLength(int documentId) {
+    return documentLengths[documentId];
+}
+
+double InvertedIndex::getAverageDocumentLength() {
+    return averageDocumentLength;
 }

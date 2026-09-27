@@ -23,6 +23,10 @@ int main() {
             tokenizer.tokenize(doc.text);
 
         index.addDocument(doc.id, tokens);
+
+        
+
+        
     }
 
     std::vector<Posting> results =
