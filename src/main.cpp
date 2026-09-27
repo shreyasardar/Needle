@@ -9,19 +9,14 @@ int main() {
 
     std::cout << "Needle search engine starting...\n\n";
 
-    // Load documents
     DocumentLoader loader;
-
     std::vector<Document> documents =
         loader.load("data/corpus/documents.txt");
 
-    // Create tokenizer
     Tokenizer tokenizer;
 
-    // Create inverted index
     InvertedIndex index;
 
-    // Process every document
     for (const Document& doc : documents) {
 
         std::vector<std::string> tokens =
@@ -30,14 +25,20 @@ int main() {
         index.addDocument(doc.id, tokens);
     }
 
-    // Search the index
-    std::vector<int> results =
-        index.search("systems");
+    std::vector<Posting> results =
+        index.search("computer");
 
-    std::cout << "Documents containing 'computer':\n";
+    std::cout << "Documents containing 'computer':\n\n";
 
-    for (int documentId : results) {
-        std::cout << documentId << '\n';
+    for (const Posting& posting : results) {
+
+        std::cout << "Document ID: "
+                  << posting.documentId << '\n';
+
+        std::cout << "Term Frequency: "
+                  << posting.termFrequency << '\n';
+
+        std::cout << "-----------------------------\n";
     }
 
     return 0;

@@ -1,16 +1,35 @@
 #include "InvertedIndex.h"
 
+#include <unordered_map>
+
 void InvertedIndex::addDocument(
     int documentId,
     const std::vector<std::string>& tokens
 ) {
-    for (const std::string& token : tokens) {
+    std::unordered_map<std::string, int> termFrequency;
 
-        index[token].push_back(documentId);
+    // Count how many times each word appears
+    // in this document.
+    for (const std::string& token : tokens) {
+        termFrequency[token]++;
+    }
+
+    // Add the word and its frequency to the index.
+    for (const auto& entry : termFrequency) {
+
+        const std::string& word = entry.first;
+        int frequency = entry.second;
+
+        Posting posting;
+
+        posting.documentId = documentId;
+        posting.termFrequency = frequency;
+
+        index[word].push_back(posting);
     }
 }
 
-std::vector<int> InvertedIndex::search(
+std::vector<Posting> InvertedIndex::search(
     const std::string& word
 ) {
     if (index.find(word) == index.end()) {
