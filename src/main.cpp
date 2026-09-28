@@ -31,7 +31,7 @@ int main() {
     BM25 bm25(index);
 
     std::vector<SearchResult> results =
-    bm25.search("computer");
+    bm25.search("computer",2);
 
     for (const SearchResult& result : results) {
 

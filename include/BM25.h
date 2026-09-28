@@ -29,6 +29,7 @@ public:
     );
 
     std::vector<SearchResult> search(
-    const std::string& word
+    const std::string& word,
+    int k
 );
 };

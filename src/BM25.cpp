@@ -1,6 +1,7 @@
 #include "BM25.h"
 
 #include <cmath>
+#include <algorithm>
 
 BM25::BM25(const InvertedIndex& index)
     : index(index) {
@@ -51,7 +52,7 @@ double BM25::calculateScore(
 }
 
 std::vector<SearchResult> BM25::search(
-    const std::string& word
+    const std::string& word, int k
 ) {
     std::vector<SearchResult> results;
 
@@ -74,6 +75,18 @@ std::vector<SearchResult> BM25::search(
 
         results.push_back(result);
     }
+
+    std::sort(
+    results.begin(),
+    results.end(),
+    [](const SearchResult& a, const SearchResult& b) {
+        return a.score > b.score;
+    }
+);
+
+if (results.size() > static_cast<size_t>(k)) {
+    results.resize(k);
+}
 
     return results;
 }
