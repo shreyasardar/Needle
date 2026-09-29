@@ -8,11 +8,18 @@
 #include "IndexWriter.h"
 #include "IndexReader.h"
 
-int main() {
+int main(int argc, char* argv[]) {
+    if (argc < 2) {
+    std::cout << "Usage:\n";
+    std::cout << "  needle --build\n";
+    std::cout << "  needle --search <query>\n";
+    return 1;
+}
 
-    std::cout << "Needle search engine starting...\n\n";
+if (std::string(argv[1]) == "--build") {
+    std::cout << "Build mode selected.\n";
 
-    DocumentLoader loader;
+      DocumentLoader loader;
     std::vector<Document> documents =
         loader.load("data/corpus/documents.txt");
 
@@ -29,24 +36,32 @@ int main() {
 
         
     }
-
-   
-
     IndexWriter writer;
 writer.save(index, "index.txt");
+}
 
+    std::cout << "Needle search engine starting...\n\n";
+
+  if (std::string(argv[1]) == "--search") {
+    std::cout << "Search mode selected.\n";
+
+if (argc < 3) {
+    std::cout << "Please provide a search query.\n";
+    return 1;
+}
+
+std::string query = argv[2];
 InvertedIndex loadedIndex;
 
 IndexReader reader;
 reader.load(loadedIndex, "index.txt");
 
- BM25 bm25(loadedIndex);
+BM25 bm25(loadedIndex);
 
-    std::vector<SearchResult> results =
-    bm25.search("computer",2);
+std::vector<SearchResult> results =
+    bm25.search(query, 2);
 
     for (const SearchResult& result : results) {
-
     std::cout << "Document ID: "
               << result.documentId << '\n';
 
@@ -54,7 +69,16 @@ reader.load(loadedIndex, "index.txt");
               << result.score << '\n';
 
     std::cout << "-----------------------------\n";
-} 
+}
+}
+
+   
+
+    
+
+
+
+
 
     return 0;
 }
