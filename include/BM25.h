@@ -36,4 +36,9 @@ std::vector<SearchResult> search(
     const std::vector<std::string>& words,
     int k
 );
+
+std::vector<SearchResult> searchAND(
+    const std::vector<std::string>& words,
+    int k
+);
 };

@@ -140,3 +140,92 @@ std::vector<SearchResult> BM25::search(
 
     return results;
 }
+
+
+std::vector<SearchResult> BM25::searchAND(
+    const std::vector<std::string>& words,
+    int k
+) {
+    std::unordered_map<int, double> scores;
+
+    if (words.empty()) {
+        return {};
+    }
+
+    // Start with the documents containing the first term
+    std::vector<Posting> firstPostings =
+        index.search(words[0]);
+
+    for (const Posting& posting : firstPostings) {
+        double score =
+            calculateScore(
+                words[0],
+                posting.documentId,
+                posting.termFrequency
+            );
+
+        scores[posting.documentId] = score;
+    }
+
+    // Keep only documents that contain every remaining term
+    for (size_t i = 1; i < words.size(); i++) {
+
+        std::vector<Posting> postings =
+            index.search(words[i]);
+
+        std::unordered_map<int, int> termDocuments;
+
+        for (const Posting& posting : postings) {
+            termDocuments[posting.documentId] =
+                posting.termFrequency;
+        }
+
+        for (auto it = scores.begin(); it != scores.end();) {
+
+            int documentId = it->first;
+
+            if (termDocuments.find(documentId) ==
+                termDocuments.end()) {
+
+                it = scores.erase(it);
+
+            } else {
+
+                int termFrequency =
+                    termDocuments[documentId];
+
+                it->second +=
+                    calculateScore(
+                        words[i],
+                        documentId,
+                        termFrequency
+                    );
+
+                ++it;
+            }
+        }
+    }
+
+    std::vector<SearchResult> results;
+
+    for (const auto& entry : scores) {
+        SearchResult result;
+        result.documentId = entry.first;
+        result.score = entry.second;
+        results.push_back(result);
+    }
+
+    std::sort(
+        results.begin(),
+        results.end(),
+        [](const SearchResult& a, const SearchResult& b) {
+            return a.score > b.score;
+        }
+    );
+
+    if (results.size() > static_cast<size_t>(k)) {
+        results.resize(k);
+    }
+
+    return results;
+}

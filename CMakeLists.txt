@@ -13,6 +13,7 @@ add_executable(needle
     src/BM25.cpp
     src/IndexWriter.cpp
     src/IndexReader.cpp
+        src/QueryParser.cpp
 )
 
 target_include_directories(needle PRIVATE include)

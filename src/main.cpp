@@ -7,6 +7,7 @@
 #include "BM25.h"
 #include "IndexWriter.h"
 #include "IndexReader.h"
+#include "QueryParser.h"
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
@@ -67,12 +68,32 @@ reader.load(loadedIndex, "index.txt");
 BM25 bm25(loadedIndex);
 
 Tokenizer tokenizer;
+QueryParser parser;
 
-std::vector<std::string> queryTokens =
-    tokenizer.tokenize(query);
+QueryOperator operation =
+    parser.getOperator(query);
 
-std::vector<SearchResult> results =
-    bm25.search(queryTokens, 2);
+std::vector<std::string> queryTerms =
+    parser.getTerms(query);
+
+std::vector<std::string> queryTokens;
+
+for (const std::string& term : queryTerms) {
+    std::vector<std::string> tokens =
+        tokenizer.tokenize(term);
+
+    for (const std::string& token : tokens) {
+        queryTokens.push_back(token);
+    }
+}
+
+std::vector<SearchResult> results;
+
+if (operation == QueryOperator::AND) {
+    results = bm25.searchAND(queryTokens, 2);
+} else {
+    results = bm25.search(queryTokens, 2);
+}
 
     for (const SearchResult& result : results) {
     std::cout << "Document ID: "
