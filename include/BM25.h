@@ -32,4 +32,8 @@ public:
     const std::string& word,
     int k
 );
+std::vector<SearchResult> search(
+    const std::vector<std::string>& words,
+    int k
+);
 };

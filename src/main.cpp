@@ -50,7 +50,15 @@ if (argc < 3) {
     return 1;
 }
 
-std::string query = argv[2];
+std::string query;
+
+for (int i = 2; i < argc; i++) {
+    query += argv[i];
+
+    if (i < argc - 1) {
+        query += " ";
+    }
+}
 InvertedIndex loadedIndex;
 
 IndexReader reader;
@@ -58,8 +66,13 @@ reader.load(loadedIndex, "index.txt");
 
 BM25 bm25(loadedIndex);
 
+Tokenizer tokenizer;
+
+std::vector<std::string> queryTokens =
+    tokenizer.tokenize(query);
+
 std::vector<SearchResult> results =
-    bm25.search(query, 2);
+    bm25.search(queryTokens, 2);
 
     for (const SearchResult& result : results) {
     std::cout << "Document ID: "

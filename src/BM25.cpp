@@ -1,5 +1,5 @@
 #include "BM25.h"
-
+#include <unordered_map>
 #include <cmath>
 #include <algorithm>
 
@@ -87,6 +87,56 @@ std::vector<SearchResult> BM25::search(
 if (results.size() > static_cast<size_t>(k)) {
     results.resize(k);
 }
+
+    return results;
+}
+
+std::vector<SearchResult> BM25::search(
+    const std::vector<std::string>& words,
+    int k
+) {
+    std::unordered_map<int, double> scores;
+
+    for (const std::string& word : words) {
+
+        std::vector<Posting> postings =
+            index.search(word);
+
+        for (const Posting& posting : postings) {
+
+            double score =
+                calculateScore(
+                    word,
+                    posting.documentId,
+                    posting.termFrequency
+                );
+
+            scores[posting.documentId] += score;
+        }
+    }
+
+    std::vector<SearchResult> results;
+
+    for (const auto& entry : scores) {
+        SearchResult result;
+
+        result.documentId = entry.first;
+        result.score = entry.second;
+
+        results.push_back(result);
+    }
+
+    std::sort(
+        results.begin(),
+        results.end(),
+        [](const SearchResult& a, const SearchResult& b) {
+            return a.score > b.score;
+        }
+    );
+
+    if (results.size() > static_cast<size_t>(k)) {
+        results.resize(k);
+    }
 
     return results;
 }
