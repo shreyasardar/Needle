@@ -42,6 +42,20 @@ void InvertedIndex::addDocument(
     }
 }
 
+void InvertedIndex::loadData(
+    const std::unordered_map<std::string, std::vector<Posting>>& loadedIndex,
+    const std::unordered_map<int, int>& loadedDocumentLengths,
+    const std::unordered_map<std::string, int>& loadedDocumentFrequencies,
+    int loadedTotalDocuments,
+    double loadedAverageDocumentLength
+) {
+    index = loadedIndex;
+    documentLengths = loadedDocumentLengths;
+    documentFrequency = loadedDocumentFrequencies;
+    totalDocuments = loadedTotalDocuments;
+    averageDocumentLength = loadedAverageDocumentLength;
+}
+
 std::vector<Posting> InvertedIndex::search(
     const std::string& word
 ) const {
@@ -73,4 +87,19 @@ int InvertedIndex::getDocumentFrequency(
 
 int InvertedIndex::getTotalDocuments() const {
     return totalDocuments;
+}
+
+const std::unordered_map<std::string, std::vector<Posting>>&
+InvertedIndex::getIndex() const {
+    return index;
+}
+
+const std::unordered_map<int, int>&
+InvertedIndex::getDocumentLengths() const {
+    return documentLengths;
+}
+
+const std::unordered_map<std::string, int>&
+InvertedIndex::getDocumentFrequencies() const {
+    return documentFrequency;
 }

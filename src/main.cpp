@@ -5,6 +5,8 @@
 #include "Tokenizer.h"
 #include "InvertedIndex.h"
 #include "BM25.h"
+#include "IndexWriter.h"
+#include "IndexReader.h"
 
 int main() {
 
@@ -28,7 +30,17 @@ int main() {
         
     }
 
-    BM25 bm25(index);
+   
+
+    IndexWriter writer;
+writer.save(index, "index.txt");
+
+InvertedIndex loadedIndex;
+
+IndexReader reader;
+reader.load(loadedIndex, "index.txt");
+
+ BM25 bm25(loadedIndex);
 
     std::vector<SearchResult> results =
     bm25.search("computer",2);

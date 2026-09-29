@@ -11,6 +11,8 @@ add_executable(needle
     src/Tokenizer.cpp
     src/InvertedIndex.cpp
     src/BM25.cpp
+    src/IndexWriter.cpp
+    src/IndexReader.cpp
 )
 
 target_include_directories(needle PRIVATE include)

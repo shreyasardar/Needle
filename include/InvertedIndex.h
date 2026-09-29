@@ -35,5 +35,17 @@ double getAverageDocumentLength() const;
 int getDocumentFrequency(const std::string& word) const;
     int getTotalDocuments() const;
 
+ const std::unordered_map<std::string, std::vector<Posting>>& getIndex() const;
 
+  const std::unordered_map<int, int>& getDocumentLengths() const;
+
+  const std::unordered_map<std::string, int>& getDocumentFrequencies() const;
+
+  void loadData(
+    const std::unordered_map<std::string, std::vector<Posting>>& loadedIndex,
+    const std::unordered_map<int, int>& loadedDocumentLengths,
+    const std::unordered_map<std::string, int>& loadedDocumentFrequencies,
+    int loadedTotalDocuments,
+    double loadedAverageDocumentLength
+);
 };
