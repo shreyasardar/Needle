@@ -99,21 +99,57 @@ if (section == "INDEX") {
 
     std::string postingData;
 
-    while (ss >> postingData) {
-        size_t colon = postingData.find(':');
+   while (ss >> postingData) {
 
-        int documentId =
-            std::stoi(postingData.substr(0, colon));
+    size_t firstColon =
+        postingData.find(':');
 
-        int termFrequency =
-            std::stoi(postingData.substr(colon + 1));
+    size_t secondColon =
+        postingData.find(':', firstColon + 1);
 
-        Posting posting;
-        posting.documentId = documentId;
-        posting.termFrequency = termFrequency;
+    int documentId =
+        std::stoi(
+            postingData.substr(
+                0,
+                firstColon
+            )
+        );
 
-        loadedIndex[word].push_back(posting);
+    int termFrequency =
+        std::stoi(
+            postingData.substr(
+                firstColon + 1,
+                secondColon - firstColon - 1
+            )
+        );
+
+    Posting posting;
+    posting.documentId = documentId;
+    posting.termFrequency = termFrequency;
+
+    std::string positionData =
+        postingData.substr(secondColon + 1);
+
+    std::stringstream positionStream(
+        positionData
+    );
+
+    std::string position;
+
+    while (std::getline(
+        positionStream,
+        position,
+        ','
+    )) {
+        if (!position.empty()) {
+            posting.positions.push_back(
+                std::stoi(position)
+            );
+        }
     }
+
+    loadedIndex[word].push_back(posting);
+}
 
     continue;
 }

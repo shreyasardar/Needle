@@ -229,3 +229,113 @@ std::vector<SearchResult> BM25::searchAND(
 
     return results;
 }
+
+
+std::vector<SearchResult> BM25::searchPhrase(
+    const std::vector<std::string>& words,
+    int k
+) {
+    std::vector<SearchResult> results;
+
+    if (words.empty()) {
+        return results;
+    }
+
+    std::vector<Posting> firstPostings =
+        index.search(words[0]);
+
+    for (const Posting& firstPosting : firstPostings) {
+
+        int documentId = firstPosting.documentId;
+
+        bool phraseFound = false;
+
+        for (int startPosition : firstPosting.positions) {
+
+            bool matches = true;
+
+            for (size_t i = 1; i < words.size(); i++) {
+
+                std::vector<Posting> postings =
+                    index.search(words[i]);
+
+                bool foundPosition = false;
+
+                for (const Posting& posting : postings) {
+
+                    if (posting.documentId != documentId) {
+                        continue;
+                    }
+
+                    int requiredPosition =
+                        startPosition + static_cast<int>(i);
+
+                    for (int position : posting.positions) {
+
+                        if (position == requiredPosition) {
+                            foundPosition = true;
+                            break;
+                        }
+                    }
+
+                    break;
+                }
+
+                if (!foundPosition) {
+                    matches = false;
+                    break;
+                }
+            }
+
+            if (matches) {
+                phraseFound = true;
+                break;
+            }
+        }
+
+        if (phraseFound) {
+
+            double score = 0.0;
+
+            for (const std::string& word : words) {
+
+                std::vector<Posting> postings =
+                    index.search(word);
+
+                for (const Posting& posting : postings) {
+
+                    if (posting.documentId == documentId) {
+
+                        score += calculateScore(
+                            word,
+                            documentId,
+                            posting.termFrequency
+                        );
+
+                        break;
+                    }
+                }
+            }
+
+            SearchResult result;
+            result.documentId = documentId;
+            result.score = score;
+
+            results.push_back(result);
+        }
+    }
+
+    std::sort(
+        results.begin(),
+        results.end(),
+        [](const SearchResult& a, const SearchResult& b) {
+            return a.score > b.score;
+        }
+    );
+
+    if (results.size() > static_cast<size_t>(k)) {
+        results.resize(k);
+    }
+
+    return results;
+}

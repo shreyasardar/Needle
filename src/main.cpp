@@ -73,6 +73,11 @@ QueryParser parser;
 QueryOperator operation =
     parser.getOperator(query);
 
+    bool isPhraseQuery =
+    query.size() >= 2 &&
+    query.front() == '"' &&
+    query.back() == '"';
+
 std::vector<std::string> queryTerms =
     parser.getTerms(query);
 
@@ -89,7 +94,9 @@ for (const std::string& term : queryTerms) {
 
 std::vector<SearchResult> results;
 
-if (operation == QueryOperator::AND) {
+if (isPhraseQuery) {
+    results = bm25.searchPhrase(queryTokens, 2);
+} else if (operation == QueryOperator::AND) {
     results = bm25.searchAND(queryTokens, 2);
 } else {
     results = bm25.search(queryTokens, 2);

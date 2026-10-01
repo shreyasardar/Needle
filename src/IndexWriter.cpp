@@ -13,9 +13,15 @@ for (const auto& entry : data) {
     file << entry.first << " ";
 
     for (const auto& posting : entry.second) {
-        file << posting.documentId << ":"
-             << posting.termFrequency << " ";
+    file << posting.documentId << ":"
+         << posting.termFrequency << ":";
+
+    for (int position : posting.positions) {
+        file << position << ",";
     }
+
+    file << " ";
+}
 
     file << "\n";
 }
