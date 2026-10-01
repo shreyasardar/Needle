@@ -17,3 +17,13 @@ add_executable(needle
 )
 
 target_include_directories(needle PRIVATE include)
+
+
+add_executable(needle_test
+    tests/test_main.cpp
+    src/Tokenizer.cpp
+    src/InvertedIndex.cpp
+    src/BM25.cpp
+)
+
+target_include_directories(needle_test PRIVATE include)
