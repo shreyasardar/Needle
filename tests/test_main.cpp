@@ -139,4 +139,30 @@ if (!wrongPhraseResults.empty()) {
 std::cout << "Negative phrase test: PASS\n";
 
     return 0;
+
+
+
+std::vector<SearchResult> testResults = {
+    {1, 5.0},
+    {2, 2.0},
+    {3, 9.0},
+    {4, 4.0},
+    {5, 7.0}
+};
+
+std::vector<SearchResult> topResults =
+    bm25.getTopK(testResults, 2);
+
+if (topResults.size() != 2) {
+    std::cout << "Top-K test: FAIL\n";
+    return 1;
+}
+
+if (topResults[0].documentId != 3 ||
+    topResults[1].documentId != 5) {
+    std::cout << "Top-K test: FAIL\n";
+    return 1;
+}
+
+std::cout << "Top-K test: PASS\n";
 }

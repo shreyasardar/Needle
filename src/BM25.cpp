@@ -75,20 +75,7 @@ std::vector<SearchResult> BM25::search(
 
         results.push_back(result);
     }
-
-    std::sort(
-    results.begin(),
-    results.end(),
-    [](const SearchResult& a, const SearchResult& b) {
-        return a.score > b.score;
-    }
-);
-
-if (results.size() > static_cast<size_t>(k)) {
-    results.resize(k);
-}
-
-    return results;
+return getTopK(results, k);
 }
 
 std::vector<SearchResult> BM25::search(
@@ -126,19 +113,7 @@ std::vector<SearchResult> BM25::search(
         results.push_back(result);
     }
 
-    std::sort(
-        results.begin(),
-        results.end(),
-        [](const SearchResult& a, const SearchResult& b) {
-            return a.score > b.score;
-        }
-    );
-
-    if (results.size() > static_cast<size_t>(k)) {
-        results.resize(k);
-    }
-
-    return results;
+    return getTopK(results, k);
 }
 
 
@@ -215,19 +190,7 @@ std::vector<SearchResult> BM25::searchAND(
         results.push_back(result);
     }
 
-    std::sort(
-        results.begin(),
-        results.end(),
-        [](const SearchResult& a, const SearchResult& b) {
-            return a.score > b.score;
-        }
-    );
-
-    if (results.size() > static_cast<size_t>(k)) {
-        results.resize(k);
-    }
-
-    return results;
+    return getTopK(results, k);
 }
 
 
@@ -338,4 +301,40 @@ std::vector<SearchResult> BM25::searchPhrase(
     }
 
     return results;
+}
+
+std::vector<SearchResult> BM25::getTopK(
+    const std::vector<SearchResult>& results,
+    int k
+) {
+    std::priority_queue<
+        SearchResult,
+        std::vector<SearchResult>,
+        CompareSearchResult
+    > heap;
+
+    for (const SearchResult& result : results) {
+        heap.push(result);
+
+        if (heap.size() > static_cast<size_t>(k)) {
+            heap.pop();
+        }
+    }
+
+    std::vector<SearchResult> topResults;
+
+    while (!heap.empty()) {
+        topResults.push_back(heap.top());
+        heap.pop();
+    }
+
+    std::sort(
+        topResults.begin(),
+        topResults.end(),
+        [](const SearchResult& a, const SearchResult& b) {
+            return a.score > b.score;
+        }
+    );
+
+    return topResults;
 }
