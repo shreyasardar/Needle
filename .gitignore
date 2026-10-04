@@ -18,5 +18,7 @@ Makefile
 # Large datasets
 data/corpus/
 
+data/benchmark/
+
 # Generated search index
 index.txt

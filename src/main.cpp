@@ -1,5 +1,7 @@
 #include <iostream>
 #include <vector>
+#include <chrono>
+#include <string>
 
 #include "DocumentLoader.h"
 #include "Tokenizer.h"
@@ -12,17 +14,23 @@
 int main(int argc, char* argv[]) {
     if (argc < 2) {
     std::cout << "Usage:\n";
-    std::cout << "  needle --build\n";
+    std::cout << "  needle --build <corpus_path>\n";
     std::cout << "  needle --search <query>\n";
+    std::cout << "  needle --interactive\n";
     return 1;
 }
 
 if (std::string(argv[1]) == "--build") {
     std::cout << "Build mode selected.\n";
 
-      DocumentLoader loader;
+    if (argc < 3) {
+        std::cout << "Please provide a corpus path.\n";
+        return 1;
+    }
+
+    DocumentLoader loader;
     std::vector<Document> documents =
-        loader.load("data/corpus/documents.txt");
+        loader.load(argv[2]);
 
     Tokenizer tokenizer;
 
@@ -42,6 +50,87 @@ writer.save(index, "index.txt");
 }
 
     std::cout << "Needle search engine starting...\n\n";
+
+  if (std::string(argv[1]) == "--interactive") {
+    std::cout << "Interactive search mode selected.\n";
+
+    InvertedIndex loadedIndex;
+
+    IndexReader reader;
+    reader.load(loadedIndex, "index.txt");
+
+    BM25 bm25(loadedIndex);
+
+    Tokenizer tokenizer;
+QueryParser parser;
+
+    std::string query;
+
+while (true) {
+    std::cout << "\nQuery: ";
+    std::getline(std::cin, query);
+
+    if (query == "exit") {
+        break;
+    }
+
+    QueryOperator operation =
+    parser.getOperator(query);
+
+bool isPhraseQuery =
+    query.size() >= 2 &&
+    query.front() == '"' &&
+    query.back() == '"';
+
+std::vector<std::string> queryTerms =
+    parser.getTerms(query);
+
+std::vector<std::string> queryTokens;
+
+for (const std::string& term : queryTerms) {
+    std::vector<std::string> tokens =
+        tokenizer.tokenize(term);
+
+    for (const std::string& token : tokens) {
+        queryTokens.push_back(token);
+    }
+}
+
+
+
+auto searchStart = std::chrono::high_resolution_clock::now();
+
+std::vector<SearchResult> results;
+
+if (isPhraseQuery) {
+    results = bm25.searchPhrase(queryTokens, 2);
+} else if (operation == QueryOperator::AND) {
+    results = bm25.searchAND(queryTokens, 2);
+} else {
+    results = bm25.search(queryTokens, 2);
+}
+
+auto searchEnd = std::chrono::high_resolution_clock::now();
+
+double searchTime =
+    std::chrono::duration<double, std::milli>(
+        searchEnd - searchStart
+    ).count();
+
+std::cout << "Search time: "
+          << searchTime
+          << " ms\n";
+for (const SearchResult& result : results) {
+    std::cout << "Document ID: "
+              << result.documentId << '\n';
+
+    std::cout << "BM25 Score: "
+              << result.score << '\n';
+
+    std::cout << "-----------------------------\n";
+}
+}
+}
 
   if (std::string(argv[1]) == "--search") {
     std::cout << "Search mode selected.\n";
@@ -63,7 +152,19 @@ for (int i = 2; i < argc; i++) {
 InvertedIndex loadedIndex;
 
 IndexReader reader;
+
+auto loadStart = std::chrono::high_resolution_clock::now();
+
 reader.load(loadedIndex, "index.txt");
+
+auto loadEnd = std::chrono::high_resolution_clock::now();
+
+double loadTime =
+    std::chrono::duration<double>(loadEnd - loadStart).count();
+
+std::cout << "Index load time: "
+          << loadTime
+          << " seconds\n";
 
 BM25 bm25(loadedIndex);
 
