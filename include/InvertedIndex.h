@@ -26,6 +26,9 @@ public:
         const std::vector<std::string>& tokens
     );
 
+
+    void merge(const InvertedIndex& other);
+
     std::vector<Posting> search(
         const std::string& word
     ) const ;

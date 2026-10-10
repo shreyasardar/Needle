@@ -4,6 +4,7 @@
 
 #include "Tokenizer.h"
 #include "InvertedIndex.h"
+#include <cassert>
 #include "BM25.h"
 
 int main() {
@@ -138,6 +139,26 @@ if (!wrongPhraseResults.empty()) {
 
 std::cout << "Negative phrase test: PASS\n";
 
+InvertedIndex index1;
+InvertedIndex index2;
+
+index1.addDocument(
+    1,
+    {"computer", "networks"}
+);
+
+index2.addDocument(
+    2,
+    {"computer", "database"}
+);
+
+index1.merge(index2);
+
+assert(index1.getTotalDocuments() == 2);
+assert(index1.getDocumentFrequency("computer") == 2);
+assert(index1.search("computer").size() == 2);
+std::cout << "Index merge test: PASS\n";
+
     return 0;
 
 
@@ -165,4 +186,6 @@ if (topResults[0].documentId != 3 ||
 }
 
 std::cout << "Top-K test: PASS\n";
+
+
 }

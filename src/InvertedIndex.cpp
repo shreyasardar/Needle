@@ -104,3 +104,30 @@ const std::unordered_map<std::string, int>&
 InvertedIndex::getDocumentFrequencies() const {
     return documentFrequency;
 }
+
+void InvertedIndex::merge(const InvertedIndex& other) {
+    for (const auto& entry : other.index) {
+        const std::string& word = entry.first;
+
+        for (const Posting& posting : entry.second) {
+            index[word].push_back(posting);
+        }
+    }
+
+    for (const auto& entry : other.documentLengths) {
+        documentLengths[entry.first] = entry.second;
+    }
+
+    for (const auto& entry : other.documentFrequency) {
+        documentFrequency[entry.first] += entry.second;
+    }
+
+    totalDocuments += other.totalDocuments;
+    totalDocumentLength += other.totalDocumentLength;
+
+    if (totalDocuments > 0) {
+        averageDocumentLength =
+            static_cast<double>(totalDocumentLength) /
+            totalDocuments;
+    }
+}
