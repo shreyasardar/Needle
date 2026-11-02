@@ -1,12 +1,16 @@
+
 #include "BM25.h"
 #include <unordered_map>
 #include <cmath>
 #include <algorithm>
 
+// Constructor
 BM25::BM25(const InvertedIndex& index)
     : index(index) {
 }
 
+
+// Calculate IDF
 double BM25::calculateIDF(
     const std::string& word
 ) {
@@ -23,13 +27,13 @@ double BM25::calculateIDF(
     );
 }
 
+
+// Calculate BM25 score
 double BM25::calculateScore(
-    const std::string& word,
+    double idf,
     int documentId,
     int termFrequency
 ) {
-    double idf = calculateIDF(word);
-
     double documentLength =
         index.getDocumentLength(documentId);
 
@@ -51,52 +55,89 @@ double BM25::calculateScore(
     return idf * (numerator / denominator);
 }
 
+
+// Single-word search with streaming Top-K
 std::vector<SearchResult> BM25::search(
     const std::string& word, int k
 ) {
-    std::vector<SearchResult> results;
+    if (k <= 0) {
+        return {};
+    }
 
-    std::vector<Posting> postings =
+    std::priority_queue<
+        SearchResult,
+        std::vector<SearchResult>,
+        CompareSearchResult
+    > heap;
+
+    const std::vector<Posting>& postings =
         index.search(word);
+
+    double idf = calculateIDF(word);
 
     for (const Posting& posting : postings) {
 
-        double score =
-            calculateScore(
-                word,
-                posting.documentId,
-                posting.termFrequency
-            );
+        double score = calculateScore(
+            idf,
+            posting.documentId,
+            posting.termFrequency
+        );
 
         SearchResult result;
-
         result.documentId = posting.documentId;
         result.score = score;
 
-        results.push_back(result);
+        heap.push(result);
+
+        if (heap.size() > static_cast<size_t>(k)) {
+            heap.pop();
+        }
     }
-return getTopK(results, k);
+
+    std::vector<SearchResult> topResults;
+
+    while (!heap.empty()) {
+        topResults.push_back(heap.top());
+        heap.pop();
+    }
+
+    std::sort(
+        topResults.begin(),
+        topResults.end(),
+        [](const SearchResult& a, const SearchResult& b) {
+            return a.score > b.score;
+        }
+    );
+
+    return topResults;
 }
 
+
+// Multi-word OR search
 std::vector<SearchResult> BM25::search(
     const std::vector<std::string>& words,
     int k
 ) {
+    if (k <= 0) {
+        return {};
+    }
+
     std::unordered_map<int, double> scores;
 
     for (const std::string& word : words) {
 
-        std::vector<Posting> postings =
+        const std::vector<Posting>& postings =
             index.search(word);
+
+        double idf = calculateIDF(word);
 
         for (const Posting& posting : postings) {
 
-            double score =
-                calculateScore(
-                    word,
-                    posting.documentId,
-                    posting.termFrequency
-                );
+            double score = calculateScore(
+                idf,
+                posting.documentId,
+                posting.termFrequency
+            );
 
             scores[posting.documentId] += score;
         }
@@ -106,10 +147,8 @@ std::vector<SearchResult> BM25::search(
 
     for (const auto& entry : scores) {
         SearchResult result;
-
         result.documentId = entry.first;
         result.score = entry.second;
-
         results.push_back(result);
     }
 
@@ -117,36 +156,39 @@ std::vector<SearchResult> BM25::search(
 }
 
 
+// AND search
 std::vector<SearchResult> BM25::searchAND(
     const std::vector<std::string>& words,
     int k
 ) {
-    std::unordered_map<int, double> scores;
-
-    if (words.empty()) {
+    if (words.empty() || k <= 0) {
         return {};
     }
 
-    // Start with the documents containing the first term
-    std::vector<Posting> firstPostings =
+    std::unordered_map<int, double> scores;
+
+    const std::vector<Posting>& firstPostings =
         index.search(words[0]);
 
+    double firstIDF = calculateIDF(words[0]);
+
     for (const Posting& posting : firstPostings) {
-        double score =
-            calculateScore(
-                words[0],
-                posting.documentId,
-                posting.termFrequency
-            );
+
+        double score = calculateScore(
+            firstIDF,
+            posting.documentId,
+            posting.termFrequency
+        );
 
         scores[posting.documentId] = score;
     }
 
-    // Keep only documents that contain every remaining term
     for (size_t i = 1; i < words.size(); i++) {
 
-        std::vector<Posting> postings =
+        const std::vector<Posting>& postings =
             index.search(words[i]);
+
+        double idf = calculateIDF(words[i]);
 
         std::unordered_map<int, int> termDocuments;
 
@@ -169,12 +211,11 @@ std::vector<SearchResult> BM25::searchAND(
                 int termFrequency =
                     termDocuments[documentId];
 
-                it->second +=
-                    calculateScore(
-                        words[i],
-                        documentId,
-                        termFrequency
-                    );
+                it->second += calculateScore(
+                    idf,
+                    documentId,
+                    termFrequency
+                );
 
                 ++it;
             }
@@ -194,17 +235,18 @@ std::vector<SearchResult> BM25::searchAND(
 }
 
 
+// Phrase search
 std::vector<SearchResult> BM25::searchPhrase(
     const std::vector<std::string>& words,
     int k
 ) {
     std::vector<SearchResult> results;
 
-    if (words.empty()) {
+    if (words.empty() || k <= 0) {
         return results;
     }
 
-    std::vector<Posting> firstPostings =
+    const std::vector<Posting>& firstPostings =
         index.search(words[0]);
 
     for (const Posting& firstPosting : firstPostings) {
@@ -219,7 +261,7 @@ std::vector<SearchResult> BM25::searchPhrase(
 
             for (size_t i = 1; i < words.size(); i++) {
 
-                std::vector<Posting> postings =
+                const std::vector<Posting>& postings =
                     index.search(words[i]);
 
                 bool foundPosition = false;
@@ -262,15 +304,17 @@ std::vector<SearchResult> BM25::searchPhrase(
 
             for (const std::string& word : words) {
 
-                std::vector<Posting> postings =
+                const std::vector<Posting>& postings =
                     index.search(word);
+
+                double idf = calculateIDF(word);
 
                 for (const Posting& posting : postings) {
 
                     if (posting.documentId == documentId) {
 
                         score += calculateScore(
-                            word,
+                            idf,
                             documentId,
                             posting.termFrequency
                         );
@@ -288,25 +332,19 @@ std::vector<SearchResult> BM25::searchPhrase(
         }
     }
 
-    std::sort(
-        results.begin(),
-        results.end(),
-        [](const SearchResult& a, const SearchResult& b) {
-            return a.score > b.score;
-        }
-    );
-
-    if (results.size() > static_cast<size_t>(k)) {
-        results.resize(k);
-    }
-
-    return results;
+    return getTopK(results, k);
 }
 
+
+// Get the best K results
 std::vector<SearchResult> BM25::getTopK(
     const std::vector<SearchResult>& results,
     int k
 ) {
+    if (k <= 0) {
+        return {};
+    }
+
     std::priority_queue<
         SearchResult,
         std::vector<SearchResult>,
@@ -314,6 +352,7 @@ std::vector<SearchResult> BM25::getTopK(
     > heap;
 
     for (const SearchResult& result : results) {
+
         heap.push(result);
 
         if (heap.size() > static_cast<size_t>(k)) {

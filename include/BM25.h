@@ -26,7 +26,7 @@ private:
 
     const double k1 = 1.2;
     const double b = 0.75;
-   
+
 
 public:
     BM25(const InvertedIndex& index);
@@ -34,7 +34,7 @@ public:
     double calculateIDF(const std::string& word);
 
     double calculateScore(
-    const std::string& word,
+    double idf,
     int documentId,
     int termFrequency
     );

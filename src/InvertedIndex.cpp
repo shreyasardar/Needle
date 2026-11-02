@@ -57,14 +57,18 @@ void InvertedIndex::loadData(
     averageDocumentLength = loadedAverageDocumentLength;
 }
 
-std::vector<Posting> InvertedIndex::search(
+const std::vector<Posting>& InvertedIndex::search(
     const std::string& word
 ) const {
-    if (index.find(word) == index.end()) {
-        return {};
+
+    auto it = index.find(word);
+
+    if (it == index.end()) {
+        static const std::vector<Posting> empty;
+        return empty;
     }
 
-    return index.at(word);
+    return it->second;
 }
 
 int InvertedIndex::getDocumentLength(int documentId) const {

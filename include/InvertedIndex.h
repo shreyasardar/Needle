@@ -29,9 +29,9 @@ public:
 
     void merge(const InvertedIndex& other);
 
-    std::vector<Posting> search(
-        const std::string& word
-    ) const ;
+    const std::vector<Posting>& search(
+    const std::string& word
+) const;
 
    int getDocumentLength(int documentId) const;
 double getAverageDocumentLength() const;

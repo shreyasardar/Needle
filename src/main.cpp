@@ -117,6 +117,8 @@ writer.save(index, "index.txt");
     IndexReader reader;
     reader.load(loadedIndex, "index.txt");
 
+
+
     BM25 bm25(loadedIndex);
 
     Tokenizer tokenizer;
@@ -224,6 +226,9 @@ std::cout << "Index load time: "
           << loadTime
           << " seconds\n";
 
+
+
+
 BM25 bm25(loadedIndex);
 
 Tokenizer tokenizer;
@@ -272,9 +277,9 @@ if (isPhraseQuery) {
 }
 }
 
-   
 
-    
+
+
 
 
 
