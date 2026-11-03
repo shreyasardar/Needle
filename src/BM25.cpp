@@ -1,8 +1,10 @@
 
 #include "BM25.h"
+
 #include <unordered_map>
 #include <cmath>
 #include <algorithm>
+#include <utility>
 
 // Constructor
 BM25::BM25(const InvertedIndex& index)
@@ -235,17 +237,44 @@ std::vector<SearchResult> BM25::searchAND(
 }
 
 
-// Phrase search
+// Optimized phrase search
 std::vector<SearchResult> BM25::searchPhrase(
     const std::vector<std::string>& words,
     int k
 ) {
-    std::vector<SearchResult> results;
-
     if (words.empty() || k <= 0) {
-        return results;
+        return {};
     }
 
+    // Build document lookup maps for each phrase term.
+    // This avoids repeatedly scanning posting lists.
+    std::vector<
+        std::unordered_map<int, const Posting*>
+    > postingMaps;
+
+    std::vector<double> idfs;
+
+    for (const std::string& word : words) {
+
+        const std::vector<Posting>& postings =
+            index.search(word);
+
+        std::unordered_map<int, const Posting*> documentMap;
+
+        for (const Posting& posting : postings) {
+            documentMap[posting.documentId] = &posting;
+        }
+
+        postingMaps.push_back(std::move(documentMap));
+
+        // Calculate IDF once per phrase term.
+        idfs.push_back(calculateIDF(word));
+    }
+
+    std::vector<SearchResult> results;
+
+    // Only documents containing the first word
+    // can be candidates for the phrase.
     const std::vector<Posting>& firstPostings =
         index.search(words[0]);
 
@@ -255,38 +284,34 @@ std::vector<SearchResult> BM25::searchPhrase(
 
         bool phraseFound = false;
 
+        // Check every possible starting position.
         for (int startPosition : firstPosting.positions) {
 
             bool matches = true;
 
+            // Check consecutive positions of remaining words.
             for (size_t i = 1; i < words.size(); i++) {
 
-                const std::vector<Posting>& postings =
-                    index.search(words[i]);
+                auto it =
+                    postingMaps[i].find(documentId);
 
-                bool foundPosition = false;
-
-                for (const Posting& posting : postings) {
-
-                    if (posting.documentId != documentId) {
-                        continue;
-                    }
-
-                    int requiredPosition =
-                        startPosition + static_cast<int>(i);
-
-                    for (int position : posting.positions) {
-
-                        if (position == requiredPosition) {
-                            foundPosition = true;
-                            break;
-                        }
-                    }
-
+                if (it == postingMaps[i].end()) {
+                    matches = false;
                     break;
                 }
 
-                if (!foundPosition) {
+                int requiredPosition =
+                    startPosition + static_cast<int>(i);
+
+                const std::vector<int>& positions =
+                    it->second->positions;
+
+                // Binary search instead of linear position scanning.
+                if (!std::binary_search(
+                        positions.begin(),
+                        positions.end(),
+                        requiredPosition)) {
+
                     matches = false;
                     break;
                 }
@@ -298,38 +323,29 @@ std::vector<SearchResult> BM25::searchPhrase(
             }
         }
 
-        if (phraseFound) {
-
-            double score = 0.0;
-
-            for (const std::string& word : words) {
-
-                const std::vector<Posting>& postings =
-                    index.search(word);
-
-                double idf = calculateIDF(word);
-
-                for (const Posting& posting : postings) {
-
-                    if (posting.documentId == documentId) {
-
-                        score += calculateScore(
-                            idf,
-                            documentId,
-                            posting.termFrequency
-                        );
-
-                        break;
-                    }
-                }
-            }
-
-            SearchResult result;
-            result.documentId = documentId;
-            result.score = score;
-
-            results.push_back(result);
+        if (!phraseFound) {
+            continue;
         }
+
+        // Calculate BM25 score using cached postings and IDFs.
+        double score = 0.0;
+
+        for (size_t i = 0; i < words.size(); i++) {
+
+            const Posting* posting =
+                postingMaps[i].at(documentId);
+
+            score += calculateScore(
+                idfs[i],
+                documentId,
+                posting->termFrequency
+            );
+        }
+
+        results.push_back({
+            documentId,
+            score
+        });
     }
 
     return getTopK(results, k);

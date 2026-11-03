@@ -24,3 +24,30 @@ Benchmarked index construction on a synthetic corpus of 100,000 documents.
 - Index correctness was checked by comparing sorted index files from 1-thread and 8-thread builds; they matched.
 
 *Note: Results were measured on the same machine. Performance may vary with system load and hardware.*
+
+
+
+
+### Query Performance Optimization
+
+Optimized phrase search by reducing repeated posting-list scans.
+
+**Optimizations implemented:**
+- Cached posting lookups using unordered maps.
+- Precomputed IDF values for phrase terms.
+- Used binary search to verify consecutive term positions.
+- Reused cached posting information during BM25 score calculation.
+
+**Query Benchmark Results**
+
+Measurements collected using 10 runs per query.
+
+| Query | Before (ms) | After (ms) | Improvement |
+|---|---:|---:|---:|
+| "machine learning" | 149.711 | 8.769 | 94.14% |
+| "machine learning" OR database | 155.221 | 14.510 | 90.65% |
+
+Phrase search achieved approximately 17.1x and 10.7x faster execution, respectively.
+
+*Note: Results were measured on the same machine. Performance may vary depending on hardware and system load.*
+

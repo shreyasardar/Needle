@@ -153,18 +153,76 @@ std::vector<SearchResult> QueryEvaluator::evaluateNode(
 
 
     // CASE 3: OR operation
+    
+    // CASE 3: OR operation using sorted merge
+
     else if (node->type == QueryNodeType::OR) {
 
-        // Add left-side results
-        for (const auto& result : leftResults) {
-            scores[result.documentId] += result.score;
+        // Sort both result lists by document ID
+        std::sort(
+            leftResults.begin(),
+            leftResults.end(),
+            [](const SearchResult& a, const SearchResult& b) {
+                return a.documentId < b.documentId;
+            }
+        );
+
+        std::sort(
+            rightResults.begin(),
+            rightResults.end(),
+            [](const SearchResult& a, const SearchResult& b) {
+                return a.documentId < b.documentId;
+            }
+        );
+
+        std::vector<SearchResult> combinedResults;
+
+        size_t i = 0;
+        size_t j = 0;
+
+        // Merge both lists
+        while (i < leftResults.size() &&
+               j < rightResults.size()) {
+
+            if (leftResults[i].documentId ==
+                rightResults[j].documentId) {
+
+                combinedResults.push_back({
+                    leftResults[i].documentId,
+                    leftResults[i].score + rightResults[j].score
+                });
+
+                i++;
+                j++;
+            }
+            else if (leftResults[i].documentId <
+                     rightResults[j].documentId) {
+
+                combinedResults.push_back(leftResults[i]);
+                i++;
+            }
+            else {
+
+                combinedResults.push_back(rightResults[j]);
+                j++;
+            }
         }
 
-        // Add right-side results
-        for (const auto& result : rightResults) {
-            scores[result.documentId] += result.score;
+        // Add remaining left-side results
+        while (i < leftResults.size()) {
+            combinedResults.push_back(leftResults[i]);
+            i++;
         }
+
+        // Add remaining right-side results
+        while (j < rightResults.size()) {
+            combinedResults.push_back(rightResults[j]);
+            j++;
+        }
+
+        return combinedResults;
     }
+
 
 
     // Convert scores into SearchResult objects
