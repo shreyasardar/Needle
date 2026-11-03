@@ -1,3 +1,4 @@
+
 #pragma once
 
 #include <string>
@@ -16,4 +17,6 @@ public:
     std::vector<std::string> getTerms(
         const std::string& query
     ) const;
+
+    bool isValid(const std::string& query) const;
 };

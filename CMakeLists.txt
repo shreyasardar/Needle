@@ -24,6 +24,7 @@ add_executable(needle_test
     src/Tokenizer.cpp
     src/InvertedIndex.cpp
     src/BM25.cpp
+    src/QueryParser.cpp
 )
 
 target_include_directories(needle_test PRIVATE include)
