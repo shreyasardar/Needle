@@ -13,6 +13,7 @@
 #include "IndexWriter.h"
 #include "IndexReader.h"
 #include "QueryParser.h"
+#include "QueryEvaluator.h"
 
 
 void buildIndexRange(
@@ -139,8 +140,8 @@ int main(int argc, char* argv[]) {
 
         BM25 bm25(loadedIndex);
 
-        Tokenizer tokenizer;
         QueryParser parser;
+        QueryEvaluator evaluator(bm25);
 
         std::string query;
 
@@ -155,47 +156,19 @@ int main(int argc, char* argv[]) {
 
             // Validate query
             if (!parser.isValid(query)) {
-                std::cout << "Invalid query. Use e.g. computer AND networks or computer OR networks.\n";
+                std::cout << "Invalid query.\n";
                 continue;
             }
 
-            QueryOperator operation =
-                parser.getOperator(query);
-
-            bool isPhraseQuery =
-                query.size() >= 2 &&
-                query.front() == '"' &&
-                query.back() == '"';
-
-            std::vector<std::string> queryTerms =
-                parser.getTerms(query);
-
-            std::vector<std::string> queryTokens;
-
-            for (const std::string& term : queryTerms) {
-
-                std::vector<std::string> tokens =
-                    tokenizer.tokenize(term);
-
-                for (const std::string& token : tokens) {
-                    queryTokens.push_back(token);
-                }
-            }
+            // Build the Abstract Syntax Tree
+            auto queryTree = parser.parse(query);
 
             auto searchStart =
                 std::chrono::high_resolution_clock::now();
 
-            std::vector<SearchResult> results;
-
-            if (isPhraseQuery) {
-                results = bm25.searchPhrase(queryTokens, 2);
-            }
-            else if (operation == QueryOperator::AND) {
-                results = bm25.searchAND(queryTokens, 2);
-            }
-            else {
-                results = bm25.search(queryTokens, 2);
-            }
+            // Execute the complete query using QueryEvaluator
+            std::vector<SearchResult> results =
+                evaluator.evaluate(queryTree.get(), 10);
 
             auto searchEnd =
                 std::chrono::high_resolution_clock::now();
@@ -208,6 +181,10 @@ int main(int argc, char* argv[]) {
             std::cout << "Search time: "
                       << searchTime
                       << " ms\n";
+
+            if (results.empty()) {
+                std::cout << "No matching documents found.\n";
+            }
 
             for (const SearchResult& result : results) {
 
@@ -249,37 +226,16 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        Tokenizer tokenizer;
         QueryParser parser;
 
         // Validate query BEFORE loading the index
         if (!parser.isValid(query)) {
-            std::cerr << "Invalid query. Use e.g. computer AND networks or computer OR networks.\n";
+            std::cerr << "Invalid query.\n";
             return 1;
         }
 
-        QueryOperator operation =
-            parser.getOperator(query);
-
-        bool isPhraseQuery =
-            query.size() >= 2 &&
-            query.front() == '"' &&
-            query.back() == '"';
-
-        std::vector<std::string> queryTerms =
-            parser.getTerms(query);
-
-        std::vector<std::string> queryTokens;
-
-        for (const std::string& term : queryTerms) {
-
-            std::vector<std::string> tokens =
-                tokenizer.tokenize(term);
-
-            for (const std::string& token : tokens) {
-                queryTokens.push_back(token);
-            }
-        }
+        // Build the Abstract Syntax Tree
+        auto queryTree = parser.parse(query);
 
         InvertedIndex loadedIndex;
 
@@ -294,24 +250,39 @@ int main(int argc, char* argv[]) {
             std::chrono::high_resolution_clock::now();
 
         double loadTime =
-            std::chrono::duration<double>(loadEnd - loadStart).count();
+            std::chrono::duration<double, std::milli>(
+                loadEnd - loadStart
+            ).count();
 
         std::cout << "Index load time: "
-                  << loadTime
+                  << loadTime / 1000.0
                   << " seconds\n";
 
         BM25 bm25(loadedIndex);
 
-        std::vector<SearchResult> results;
+        QueryEvaluator evaluator(bm25);
 
-        if (isPhraseQuery) {
-            results = bm25.searchPhrase(queryTokens, 2);
-        }
-        else if (operation == QueryOperator::AND) {
-            results = bm25.searchAND(queryTokens, 2);
-        }
-        else {
-            results = bm25.search(queryTokens, 2);
+        auto searchStart =
+            std::chrono::high_resolution_clock::now();
+
+        // Execute the complete query using QueryEvaluator
+        std::vector<SearchResult> results =
+            evaluator.evaluate(queryTree.get(), 10);
+
+        auto searchEnd =
+            std::chrono::high_resolution_clock::now();
+
+        double searchTime =
+            std::chrono::duration<double, std::milli>(
+                searchEnd - searchStart
+            ).count();
+
+        std::cout << "Search time: "
+                  << searchTime
+                  << " ms\n";
+
+        if (results.empty()) {
+            std::cout << "No matching documents found.\n";
         }
 
         for (const SearchResult& result : results) {

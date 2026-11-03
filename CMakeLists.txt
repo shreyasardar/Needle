@@ -14,6 +14,7 @@ add_executable(needle
     src/IndexWriter.cpp
     src/IndexReader.cpp
         src/QueryParser.cpp
+    src/QueryEvaluator.cpp
 )
 
 target_include_directories(needle PRIVATE include)
@@ -25,6 +26,7 @@ add_executable(needle_test
     src/InvertedIndex.cpp
     src/BM25.cpp
     src/QueryParser.cpp
+    src/QueryEvaluator.cpp
 )
 
 target_include_directories(needle_test PRIVATE include)

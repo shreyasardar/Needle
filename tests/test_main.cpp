@@ -3,11 +3,13 @@
 #include <vector>
 #include <string>
 #include <cassert>
+#include <algorithm>
 
 #include "Tokenizer.h"
 #include "InvertedIndex.h"
 #include "BM25.h"
 #include "QueryParser.h"
+#include "QueryEvaluator.h"
 
 int main() {
 
@@ -354,7 +356,194 @@ int main() {
     }
     std::cout << "Top-K test: PASS\n";
 
+    
+    // QueryEvaluator tests
+
+    InvertedIndex evaluatorIndex;
+
+    evaluatorIndex.addDocument(
+        1,
+        {"computer", "science"}
+    );
+
+    evaluatorIndex.addDocument(
+        2,
+        {"database", "systems"}
+    );
+
+    evaluatorIndex.addDocument(
+        3,
+        {"computer", "database", "networks"}
+    );
+
+    evaluatorIndex.addDocument(
+        4,
+        {"networks", "systems"}
+    );
+
+    BM25 evaluatorBM25(evaluatorIndex);
+    QueryEvaluator evaluator(evaluatorBM25);
+
+    // Test 23: Evaluator AND query
+    auto andTree = parser.parse("computer AND database");
+
+    auto evaluatorAndResults =
+        evaluator.evaluate(andTree.get(), 10);
+
+    if (evaluatorAndResults.size() != 1 ||
+        evaluatorAndResults[0].documentId != 3) {
+        std::cout << "Evaluator AND test: FAIL\n";
+        return 1;
+    }
+
+    std::cout << "Evaluator AND test: PASS\n";
+
+    // Test 24: Evaluator OR query
+    auto orTree = parser.parse("computer OR database");
+
+    auto evaluatorOrResults =
+        evaluator.evaluate(orTree.get(), 10);
+
+    if (evaluatorOrResults.size() != 3) {
+        std::cout << "Evaluator OR test: FAIL\n";
+        return 1;
+    }
+
+    std::cout << "Evaluator OR test: PASS\n";
+
+    // Test 25: Mixed AND and OR query
+    auto mixedTree =
+        parser.parse("computer AND database OR networks");
+
+    auto mixedResults =
+        evaluator.evaluate(mixedTree.get(), 10);
+
+    if (mixedResults.size() != 2) {
+        std::cout << "Evaluator mixed query test: FAIL\n";
+        return 1;
+    }
+
+    std::cout << "Evaluator mixed query test: PASS\n";
+
+    // Test 26: Parentheses query
+    auto parenthesesTree =
+        parser.parse("(computer OR database) AND networks");
+
+    auto parenthesesResults =
+        evaluator.evaluate(parenthesesTree.get(), 10);
+
+    if (parenthesesResults.size() != 1 ||
+        parenthesesResults[0].documentId != 3) {
+        std::cout << "Evaluator parentheses test: FAIL\n";
+        return 1;
+    }
+
+    std::cout << "Evaluator parentheses test: PASS\n";
+
+    // Test 27: Null AST
+    auto nullResults = evaluator.evaluate(nullptr, 10);
+
+    if (!nullResults.empty()) {
+        std::cout << "Evaluator null AST test: FAIL\n";
+        return 1;
+    }
+
+    std::cout << "Evaluator null AST test: PASS\n";
+
+
+    
+    // Test 28: Intermediate Top-K truncation
+
+    InvertedIndex topKIndex;
+
+    // Create 12 documents containing computer or database.
+    // Only document 12 also contains networks.
+    for (int i = 1; i <= 11; i++) {
+        topKIndex.addDocument(
+            i,
+            {"computer"}
+        );
+    }
+
+    topKIndex.addDocument(
+        12,
+        {"database", "networks"}
+    );
+
+    BM25 topKBM25(topKIndex);
+    QueryEvaluator topKEvaluator(topKBM25);
+
+    auto topKTree =
+        parser.parse("(computer OR database) AND networks");
+
+    auto topKResults =
+        topKEvaluator.evaluate(topKTree.get(), 10);
+
+    if (topKResults.size() != 1 ||
+        topKResults[0].documentId != 12) {
+
+        std::cout << "Intermediate Top-K test: FAIL\n";
+        return 1;
+    }
+
+    std::cout << "Intermediate Top-K test: PASS\n";
+
+
+    
+    // Test 29: Phrase search combined with OR
+
+    InvertedIndex phraseIndex;
+
+    phraseIndex.addDocument(
+        1,
+        {"machine", "learning", "useful"}
+    );
+
+    phraseIndex.addDocument(
+        2,
+        {"database", "systems"}
+    );
+
+    phraseIndex.addDocument(
+        3,
+        {"machine", "science"}
+    );
+
+    phraseIndex.addDocument(
+        4,
+        {"machine", "learning", "database"}
+    );
+
+    BM25 phraseBM25(phraseIndex);
+    QueryEvaluator phraseEvaluator(phraseBM25);
+
+    auto phraseTree =
+        parser.parse("\"machine learning\" OR database");
+
+    auto phraseBooleanResults =
+    phraseEvaluator.evaluate(phraseTree.get(), 10);
+
+   std::vector<int> actualIds;
+
+for (const auto& result : phraseBooleanResults) {
+    actualIds.push_back(result.documentId);
+}
+
+std::sort(actualIds.begin(), actualIds.end());
+
+std::vector<int> expectedIds = {1, 2, 4};
+
+if (actualIds != expectedIds) {
+    std::cout << "Phrase OR test: FAIL\n";
+    return 1;
+}
+
+    std::cout << "Phrase OR test: PASS\n";
+
+
+
     std::cout << "\nAll tests passed!\n";
 
     return 0;
+
 }

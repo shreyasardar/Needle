@@ -1,142 +1,391 @@
+
 #include "QueryParser.h"
+
 #include <sstream>
 #include <algorithm>
 #include <cctype>
+#include <memory>
+
+
+// ========================================
+// Convert string to uppercase
+// ========================================
+
+std::string toUpper(const std::string& input) {
+
+    std::string result = input;
+
+    std::transform(
+        result.begin(),
+        result.end(),
+        result.begin(),
+        [](unsigned char c) {
+            return std::toupper(c);
+        }
+    );
+
+    return result;
+}
+
+
+// ========================================
+// Tokenize the query
+// ========================================
+
+bool tokenizeQuery(
+    const std::string& query,
+    std::vector<std::string>& tokens
+) {
+
+    size_t i = 0;
+
+    while (i < query.size()) {
+
+        // Skip whitespace
+        if (std::isspace(static_cast<unsigned char>(query[i]))) {
+            i++;
+            continue;
+        }
+
+        // Recognize parentheses
+        if (query[i] == '(' || query[i] == ')') {
+
+            tokens.push_back(std::string(1, query[i]));
+
+            i++;
+            continue;
+        }
+
+        // Recognize quoted phrases
+        if (query[i] == '"') {
+
+            size_t start = i;
+
+            i++;
+
+            while (i < query.size() && query[i] != '"') {
+                i++;
+            }
+
+            // Reject unmatched quotation marks
+            if (i == query.size()) {
+                return false;
+            }
+
+            i++;
+
+            tokens.push_back(
+                query.substr(start, i - start)
+            );
+
+            continue;
+        }
+
+        // Read normal terms
+        size_t start = i;
+
+        while (
+            i < query.size() &&
+            !std::isspace(static_cast<unsigned char>(query[i])) &&
+            query[i] != '(' &&
+            query[i] != ')'
+        ) {
+            i++;
+        }
+
+        tokens.push_back(
+            query.substr(start, i - start)
+        );
+    }
+
+    return true;
+}
+
+
+// ========================================
+// Recursive Descent Expression Parser
+// ========================================
+
+class ExpressionParser {
+
+private:
+
+    const std::vector<std::string>& tokens;
+
+    size_t position = 0;
+
+
+public:
+
+    ExpressionParser(
+        const std::vector<std::string>& tokens
+    ) : tokens(tokens) {}
+
+
+    // Entry point
+    std::unique_ptr<QueryNode> parseExpression() {
+
+        return parseOR();
+    }
+
+
+private:
+
+    // ====================================
+    // OR has lower precedence
+    // ====================================
+
+    std::unique_ptr<QueryNode> parseOR() {
+
+        auto left = parseAND();
+
+        if (!left) {
+            return nullptr;
+        }
+
+        while (
+            position < tokens.size() &&
+            toUpper(tokens[position]) == "OR"
+        ) {
+
+            position++;
+
+            auto right = parseAND();
+
+            if (!right) {
+                return nullptr;
+            }
+
+            auto parent = std::make_unique<QueryNode>(
+                QueryNodeType::OR
+            );
+
+            parent->left = std::move(left);
+            parent->right = std::move(right);
+
+            left = std::move(parent);
+        }
+
+        return left;
+    }
+
+
+    // ====================================
+    // AND has higher precedence
+    // Also supports implicit AND
+    // ====================================
+
+    std::unique_ptr<QueryNode> parseAND() {
+
+        auto left = parsePrimary();
+
+        if (!left) {
+            return nullptr;
+        }
+
+        while (position < tokens.size()) {
+
+            std::string current = toUpper(tokens[position]);
+
+            // Stop when OR is encountered
+            if (current == "OR" || tokens[position] == ")") {
+                break;
+            }
+
+            // Explicit AND
+            if (current == "AND") {
+                position++;
+            }
+
+            // Otherwise, adjacent terms mean implicit AND
+
+            auto right = parsePrimary();
+
+            if (!right) {
+                return nullptr;
+            }
+
+            auto parent = std::make_unique<QueryNode>(
+                QueryNodeType::AND
+            );
+
+            parent->left = std::move(left);
+            parent->right = std::move(right);
+
+            left = std::move(parent);
+        }
+
+        return left;
+    }
+
+
+    // ====================================
+    // Handle terms and parentheses
+    // ====================================
+
+    std::unique_ptr<QueryNode> parsePrimary() {
+
+        if (position >= tokens.size()) {
+            return nullptr;
+        }
+
+        std::string current = tokens[position];
+
+        // Handle parenthesized expression
+        if (current == "(") {
+
+            position++;
+
+            auto node = parseOR();
+
+            // Closing parenthesis must exist
+            if (
+                !node ||
+                position >= tokens.size() ||
+                tokens[position] != ")"
+            ) {
+                return nullptr;
+            }
+
+            position++;
+
+            return node;
+        }
+
+        std::string upper = toUpper(current);
+
+        // Operators cannot be standalone terms
+        if (
+            upper == "AND" ||
+            upper == "OR" ||
+            current == ")"
+        ) {
+            return nullptr;
+        }
+
+        position++;
+
+        return std::make_unique<QueryNode>(
+            QueryNodeType::TERM,
+            current
+        );
+    }
+
+
+public:
+
+    // Check whether all tokens were consumed
+    bool isFullyParsed() const {
+
+        return position == tokens.size();
+    }
+};
+
+
+// ========================================
+// Get first detected Boolean operator
+// ========================================
 
 QueryOperator QueryParser::getOperator(
     const std::string& query
 ) const {
 
-    std::string upperQuery = query;
+    std::vector<std::string> tokens;
 
-std::transform(
-    upperQuery.begin(),
-    upperQuery.end(),
-    upperQuery.begin(),
-    [](unsigned char c) {
-        return std::toupper(c);
-    }
-);
-    if (upperQuery.find(" AND ") != std::string::npos) {
-        return QueryOperator::AND;
+    if (!tokenizeQuery(query, tokens)) {
+        return QueryOperator::NONE;
     }
 
-    if (upperQuery.find(" OR ") != std::string::npos){
-        return QueryOperator::OR;
-    }
+    for (const std::string& token : tokens) {
 
+        std::string upper = toUpper(token);
+
+        if (upper == "AND") {
+            return QueryOperator::AND;
+        }
+
+        if (upper == "OR") {
+            return QueryOperator::OR;
+        }
+    }
 
     return QueryOperator::NONE;
 }
 
+
+// ========================================
+// Extract query terms
+// ========================================
+
 std::vector<std::string> QueryParser::getTerms(
     const std::string& query
 ) const {
+
+    std::vector<std::string> tokens;
     std::vector<std::string> terms;
 
-    std::stringstream ss(query);
-    std::string word;
-
-    while (ss >> word) {
-       std::string upperWord = word;
-
-std::transform(
-    upperWord.begin(),
-    upperWord.end(),
-    upperWord.begin(),
-    [](unsigned char c) {
-        return std::toupper(c);
+    if (!tokenizeQuery(query, tokens)) {
+        return terms;
     }
-);
 
-if (upperWord != "AND" && upperWord != "OR") {
-    terms.push_back(word);
-}
+    for (const std::string& token : tokens) {
+
+        std::string upper = toUpper(token);
+
+        if (
+            upper != "AND" &&
+            upper != "OR" &&
+            token != "(" &&
+            token != ")"
+        ) {
+
+            terms.push_back(token);
+        }
     }
 
     return terms;
 }
 
 
+// ========================================
+// Build Abstract Syntax Tree
+// ========================================
 
-bool QueryParser::isValid(const std::string& query) const {
+std::unique_ptr<QueryNode> QueryParser::parse(
+    const std::string& query
+) const {
 
-    std::stringstream ss(query);
-    std::vector<std::string> words;
+    std::vector<std::string> tokens;
 
-    std::string word;
-
-    while (ss >> word) {
-        std::string upperWord = word;
-
-        std::transform(
-            upperWord.begin(),
-            upperWord.end(),
-            upperWord.begin(),
-            [](unsigned char c) {
-                return std::toupper(c);
-            }
-        );
-
-        words.push_back(upperWord);
+    if (!tokenizeQuery(query, tokens) || tokens.empty()) {
+        return nullptr;
     }
 
-    // Reject empty queries
-    if (words.empty()) {
-        return false;
+    ExpressionParser parser(tokens);
+
+    auto root = parser.parseExpression();
+
+    if (!root) {
+        return nullptr;
     }
 
-    // Reject queries starting or ending with an operator
-    if (words.front() == "AND" || words.front() == "OR" ||
-        words.back() == "AND" || words.back() == "OR") {
-        return false;
+    if (!parser.isFullyParsed()) {
+        return nullptr;
     }
 
-    int operatorCount = 0;
-    QueryOperator detectedOperator = QueryOperator::NONE;
+    return root;
+}
 
-    for (const std::string& current : words) {
 
-        if (current == "AND" || current == "OR") {
+// ========================================
+// Validate query
+// ========================================
 
-            operatorCount++;
+bool QueryParser::isValid(
+    const std::string& query
+) const {
 
-            if (detectedOperator == QueryOperator::NONE) {
-                detectedOperator =
-                    (current == "AND")
-                    ? QueryOperator::AND
-                    : QueryOperator::OR;
-            }
+    auto root = parse(query);
 
-            // Reject mixed operators
-            else if (
-                (current == "AND" &&
-                 detectedOperator != QueryOperator::AND) ||
-                (current == "OR" &&
-                 detectedOperator != QueryOperator::OR)
-            ) {
-                return false;
-            }
-        }
-    }
-
-    // Reject consecutive operators
-    for (size_t i = 1; i < words.size(); i++) {
-        bool previousIsOperator =
-            words[i - 1] == "AND" || words[i - 1] == "OR";
-
-        bool currentIsOperator =
-            words[i] == "AND" || words[i] == "OR";
-
-        if (previousIsOperator && currentIsOperator) {
-            return false;
-        }
-    }
-
-    // Explicit operator must have at least two operands
-    if (operatorCount > 0 && words.size() < 3) {
-        return false;
-    }
-
-    return true;
+    return root != nullptr;
 }
