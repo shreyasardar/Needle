@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <utility>
 
+
 // Constructor
 BM25::BM25(const InvertedIndex& index)
     : index(index) {
@@ -34,13 +35,11 @@ double BM25::calculateIDF(
 double BM25::calculateScore(
     double idf,
     int documentId,
-    int termFrequency
+    int termFrequency,
+    double averageDocumentLength
 ) {
     double documentLength =
         index.getDocumentLength(documentId);
-
-    double averageDocumentLength =
-        index.getAverageDocumentLength();
 
     double lengthNormalization =
         1.0 -
@@ -60,7 +59,8 @@ double BM25::calculateScore(
 
 // Single-word search with streaming Top-K
 std::vector<SearchResult> BM25::search(
-    const std::string& word, int k
+    const std::string& word,
+    int k
 ) {
     if (k <= 0) {
         return {};
@@ -77,12 +77,16 @@ std::vector<SearchResult> BM25::search(
 
     double idf = calculateIDF(word);
 
+    double averageDocumentLength =
+        index.getAverageDocumentLength();
+
     for (const Posting& posting : postings) {
 
         double score = calculateScore(
             idf,
             posting.documentId,
-            posting.termFrequency
+            posting.termFrequency,
+            averageDocumentLength
         );
 
         SearchResult result;
@@ -124,6 +128,9 @@ std::vector<SearchResult> BM25::search(
         return {};
     }
 
+    double averageDocumentLength =
+        index.getAverageDocumentLength();
+
     std::unordered_map<int, double> scores;
 
     for (const std::string& word : words) {
@@ -138,7 +145,8 @@ std::vector<SearchResult> BM25::search(
             double score = calculateScore(
                 idf,
                 posting.documentId,
-                posting.termFrequency
+                posting.termFrequency,
+                averageDocumentLength
             );
 
             scores[posting.documentId] += score;
@@ -167,6 +175,9 @@ std::vector<SearchResult> BM25::searchAND(
         return {};
     }
 
+    double averageDocumentLength =
+        index.getAverageDocumentLength();
+
     std::unordered_map<int, double> scores;
 
     const std::vector<Posting>& firstPostings =
@@ -179,7 +190,8 @@ std::vector<SearchResult> BM25::searchAND(
         double score = calculateScore(
             firstIDF,
             posting.documentId,
-            posting.termFrequency
+            posting.termFrequency,
+            averageDocumentLength
         );
 
         scores[posting.documentId] = score;
@@ -216,7 +228,8 @@ std::vector<SearchResult> BM25::searchAND(
                 it->second += calculateScore(
                     idf,
                     documentId,
-                    termFrequency
+                    termFrequency,
+                    averageDocumentLength
                 );
 
                 ++it;
@@ -245,6 +258,9 @@ std::vector<SearchResult> BM25::searchPhrase(
     if (words.empty() || k <= 0) {
         return {};
     }
+
+    double averageDocumentLength =
+        index.getAverageDocumentLength();
 
     // Build document lookup maps for each phrase term.
     // This avoids repeatedly scanning posting lists.
@@ -338,7 +354,8 @@ std::vector<SearchResult> BM25::searchPhrase(
             score += calculateScore(
                 idfs[i],
                 documentId,
-                posting->termFrequency
+                posting->termFrequency,
+                averageDocumentLength
             );
         }
 
@@ -352,8 +369,6 @@ std::vector<SearchResult> BM25::searchPhrase(
 }
 
 
-
-
 // Search a word and return results sorted by document ID
 std::vector<SearchResult> BM25::searchByDocumentId(
     const std::string& word
@@ -365,12 +380,16 @@ std::vector<SearchResult> BM25::searchByDocumentId(
 
     double idf = calculateIDF(word);
 
+    double averageDocumentLength =
+        index.getAverageDocumentLength();
+
     for (const Posting& posting : postings) {
 
         double score = calculateScore(
             idf,
             posting.documentId,
-            posting.termFrequency
+            posting.termFrequency,
+            averageDocumentLength
         );
 
         results.push_back({
@@ -391,6 +410,9 @@ std::vector<SearchResult> BM25::searchPhraseByDocumentId(
     if (words.empty()) {
         return {};
     }
+
+    double averageDocumentLength =
+        index.getAverageDocumentLength();
 
     std::vector<
         std::unordered_map<int, const Posting*>
@@ -474,7 +496,8 @@ std::vector<SearchResult> BM25::searchPhraseByDocumentId(
             score += calculateScore(
                 idfs[i],
                 documentId,
-                posting->termFrequency
+                posting->termFrequency,
+                averageDocumentLength
             );
         }
 
@@ -487,7 +510,6 @@ std::vector<SearchResult> BM25::searchPhraseByDocumentId(
     // Results inherit document-ID order from firstPostings.
     return results;
 }
-
 
 
 // Get the best K results

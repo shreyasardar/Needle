@@ -36,7 +36,8 @@ public:
     double calculateScore(
         double idf,
         int documentId,
-        int termFrequency
+        int termFrequency,
+        double averageDocumentLength
     );
 
     // Existing search methods

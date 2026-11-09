@@ -97,6 +97,11 @@ std::vector<SearchResult> QueryEvaluator::evaluateNode(
     // CASE 2: AND operation
     if (node->type == QueryNodeType::AND) {
 
+        // Reserve maximum possible intersection size.
+        combinedResults.reserve(
+            std::min(leftResults.size(), rightResults.size())
+        );
+
         // Two-pointer intersection.
         // Only documents present in both lists are retained.
         while (i < leftResults.size() &&
@@ -131,6 +136,11 @@ std::vector<SearchResult> QueryEvaluator::evaluateNode(
 
     // CASE 3: OR operation
     else if (node->type == QueryNodeType::OR) {
+
+        // Reserve maximum possible union size.
+        combinedResults.reserve(
+            leftResults.size() + rightResults.size()
+        );
 
         // Two-pointer merge.
         // Documents from both lists are retained.
