@@ -1,4 +1,31 @@
-# Needle — C++ Search Engine
+# Needle — High-Performance C++ Search Engine
+
+Needle is a C++ full-text search engine designed for efficient document indexing and relevance-based retrieval. It uses an inverted index, BM25 ranking, Boolean query processing, positional indexing, and multithreaded index construction.
+
+## Features
+
+- **Inverted Indexing:** Efficient mapping of terms to document postings.
+- **BM25 Ranking:** Relevance-based document retrieval.
+- **Boolean Search:** Supports AND, OR, and implicit AND operators.
+- **Phrase Search:** Supports exact phrase queries using positional indexes.
+- **Query Parsing:** Recursive-descent parser with parentheses and operator precedence.
+- **Top-K Retrieval:** Returns the most relevant search results.
+- **Persistent Indexing:** Saves and loads indexes with validation and error handling.
+- **Multithreaded Indexing:** Parallel document indexing using multiple threads.
+- **Input Validation:** Handles duplicate document IDs, invalid inputs, and malformed index files.
+- **Automated Testing:** 50 test cases covering indexing, retrieval, query processing, and persistence.
+
+## Technologies Used
+
+- **Language:** C++
+- **Build System:** CMake
+- **Data Structures:** Hash Maps, Vectors, Inverted Index, Positional Postings
+- **Ranking Algorithm:** BM25
+- **Concurrency:** C++ Multithreading
+- **Testing:** Custom automated test suite
+- **Profiling:** Valgrind (Memcheck and Massif)
+
+---
 
 ## Performance Benchmarks
 
@@ -18,40 +45,40 @@ Benchmarked index construction on a synthetic corpus of 100,000 documents.
 
 - Best tested configuration: 12 threads.
 - Average build time decreased from 4.687 seconds with 1 thread to 1.533 seconds with 12 threads.
-- Observed speedup: approximately 3.06×.
-- Elapsed-time reduction: approximately 67.3%.
+- Observed speedup: approximately **3.06×**.
+- Elapsed-time reduction: approximately **67.3%**.
 - Each configuration was tested three times on a synthetic corpus of 100,000 documents.
 - Index correctness was checked by comparing sorted index files from 1-thread and 8-thread builds; they matched.
 
 *Note: Results were measured on the same machine. Performance may vary with system load and hardware.*
 
+---
 
-
-
-### Query Performance Optimization
+## Query Performance Optimization
 
 Optimized phrase search by reducing repeated posting-list scans.
 
-**Optimizations implemented:**
+### Optimizations Implemented
+
 - Cached posting lookups using unordered maps.
 - Precomputed IDF values for phrase terms.
 - Used binary search to verify consecutive term positions.
 - Reused cached posting information during BM25 score calculation.
 
-**Query Benchmark Results**
+### Query Benchmark Results
 
 Measurements collected using 10 runs per query.
 
 | Query | Before (ms) | After (ms) | Improvement |
 |---|---:|---:|---:|
-| "machine learning" | 149.711 | 8.769 | 94.14% |
-| "machine learning" OR database | 155.221 | 14.510 | 90.65% |
+| `"machine learning"` | 149.711 | 8.769 | 94.14% |
+| `"machine learning" OR database` | 155.221 | 14.510 | 90.65% |
 
-Phrase search achieved approximately 17.1x and 10.7x faster execution, respectively.
+Phrase search achieved approximately **17.1×** and **10.7×** faster execution, respectively.
 
 *Note: Results were measured on the same machine. Performance may vary depending on hardware and system load.*
 
-
+---
 
 ## Scalability Benchmarks
 
@@ -69,38 +96,9 @@ Each measurement represents the average of multiple runs.
 
 ### Results
 
-- Indexed up to 500,000 documents.
-- Maintained an average throughput of approximately 60K documents per second.
+- Indexed up to **500,000 documents**.
+- Maintained an average throughput of approximately **60K documents per second**.
 - Indexing time scales approximately linearly as dataset size increases.
-- Benchmarks include document loading, tokenization, indexing, merging and index saving.
+- Benchmarks include document loading, tokenization, indexing, merging, and index saving.
 
-## Thread Scaling Benchmark (500K Documents)
-
-Compared indexing performance using different thread configurations.
-Each configuration was tested four times.
-
-| Threads | Average Indexing Time (seconds) |
-|---:|---:|
-| 4 | 9.514 |
-| 6 | 9.119 |
-| 8 | 8.239 |
-| 12 | 9.952 |
-
-### Results
-
-- Best tested configuration: 8 threads.
-- 8 threads achieved an average indexing time of 8.239 seconds.
-- 8 threads were approximately 13.4% faster than 4 threads.
-- Increasing the thread count to 12 did not improve performance.
-- Threading overhead and resource contention can affect performance.
-
-*Note: Benchmarks were conducted on a synthetic corpus using an Intel Core i5-13420H system running Ubuntu through WSL2. Results may vary depending on hardware and system load.*
-
-^X
-q
-
-
-
-
-
-
+## Thread Scaling Benchmark (500K Documents
