@@ -5,6 +5,7 @@
 #include <string>
 #include <thread>
 #include <functional>
+#include <stdexcept>
 
 #include "DocumentLoader.h"
 #include "Tokenizer.h"
@@ -16,6 +17,7 @@
 #include "QueryEvaluator.h"
 
 
+// Build a local index for a range of documents
 void buildIndexRange(
     const std::vector<Document>& documents,
     int start,
@@ -25,6 +27,7 @@ void buildIndexRange(
     Tokenizer tokenizer;
 
     for (int i = start; i < end; i++) {
+
         std::vector<std::string> tokens =
             tokenizer.tokenize(documents[i].text);
 
@@ -40,7 +43,7 @@ int main(int argc, char* argv[]) {
 
     if (argc < 2) {
         std::cout << "Usage:\n";
-        std::cout << "  needle --build <corpus_path>\n";
+        std::cout << "  needle --build <corpus_path> <threads>\n";
         std::cout << "  needle --search <query>\n";
         std::cout << "  needle --interactive\n";
         return 1;
@@ -56,42 +59,75 @@ int main(int argc, char* argv[]) {
         std::cout << "Build mode selected.\n";
 
         if (argc < 3) {
-            std::cout << "Please provide a corpus path.\n";
+            std::cerr << "Please provide a corpus path.\n";
             return 1;
         }
 
         int numThreads = 1;
 
-        if (argc >= 4) {
-            numThreads = std::stoi(argv[3]);
+        try {
+            if (argc >= 4) {
+                numThreads = std::stoi(argv[3]);
+            }
         }
-
-        if (numThreads < 1) {
-            std::cout << "Number of threads must be at least 1.\n";
+        catch (const std::exception&) {
+            std::cerr << "Invalid number of threads.\n";
             return 1;
         }
 
+        if (numThreads < 1) {
+            std::cerr << "Number of threads must be at least 1.\n";
+            return 1;
+        }
+
+
+        // Start total indexing timer
+        auto startTime =
+            std::chrono::high_resolution_clock::now();
+
+
+        // Load documents
         DocumentLoader loader;
 
         std::vector<Document> documents =
             loader.load(argv[2]);
 
+        if (documents.empty()) {
+            std::cerr << "No documents loaded. Check the corpus path.\n";
+            return 1;
+        }
+
+        std::cout << "Documents loaded: "
+                  << documents.size() << '\n';
+
+        std::cout << "Threads used: "
+                  << numThreads << '\n';
+
+
+        // Create final index
         InvertedIndex index;
 
+        // Create one local index per thread
         std::vector<InvertedIndex> localIndexes(numThreads);
 
         std::vector<std::thread> threads;
 
-        int documentsPerThread =
-            documents.size() / numThreads;
 
+        // Divide documents among threads
+        int documentsPerThread =
+            static_cast<int>(documents.size()) / numThreads;
+
+
+        // Start worker threads
         for (int i = 0; i < numThreads; i++) {
 
             int start = i * documentsPerThread;
+
             int end = start + documentsPerThread;
 
+            // Last thread handles remaining documents
             if (i == numThreads - 1) {
-                end = documents.size();
+                end = static_cast<int>(documents.size());
             }
 
             threads.emplace_back(
@@ -103,16 +139,58 @@ int main(int argc, char* argv[]) {
             );
         }
 
+
+        // Wait for all threads
         for (std::thread& t : threads) {
             t.join();
         }
 
+
+        // Merge all local indexes
         for (int i = 0; i < numThreads; i++) {
             index.merge(localIndexes[i]);
         }
 
+
+        // Save final index
         IndexWriter writer;
+
         writer.save(index, "index.txt");
+
+
+        // Stop timer
+        auto endTime =
+            std::chrono::high_resolution_clock::now();
+
+        double indexingTime =
+            std::chrono::duration<double>(
+                endTime - startTime
+            ).count();
+
+
+        // Calculate indexing throughput
+        double throughput =
+            index.getTotalDocuments() / indexingTime;
+
+
+        // Display results
+        std::cout << "\n========== INDEXING RESULTS ==========\n";
+
+        std::cout << "Total documents indexed: "
+                  << index.getTotalDocuments() << '\n';
+
+        std::cout << "Threads used: "
+                  << numThreads << '\n';
+
+        std::cout << "Indexing time: "
+                  << indexingTime << " seconds\n";
+
+        std::cout << "Indexing throughput: "
+                  << throughput << " documents/second\n";
+
+        std::cout << "Index saved successfully.\n";
+
+        std::cout << "======================================\n";
 
         return 0;
     }
@@ -160,13 +238,13 @@ int main(int argc, char* argv[]) {
                 continue;
             }
 
-            // Build the Abstract Syntax Tree
+            // Build Abstract Syntax Tree
             auto queryTree = parser.parse(query);
 
             auto searchStart =
                 std::chrono::high_resolution_clock::now();
 
-            // Execute the complete query using QueryEvaluator
+            // Execute query
             std::vector<SearchResult> results =
                 evaluator.evaluate(queryTree.get(), 10);
 
@@ -211,7 +289,7 @@ int main(int argc, char* argv[]) {
         std::cout << "Search mode selected.\n";
 
         if (argc < 3) {
-            std::cout << "Please provide a search query.\n";
+            std::cerr << "Please provide a search query.\n";
             return 1;
         }
 
@@ -228,13 +306,13 @@ int main(int argc, char* argv[]) {
 
         QueryParser parser;
 
-        // Validate query BEFORE loading the index
+        // Validate query before loading index
         if (!parser.isValid(query)) {
             std::cerr << "Invalid query.\n";
             return 1;
         }
 
-        // Build the Abstract Syntax Tree
+        // Build Abstract Syntax Tree
         auto queryTree = parser.parse(query);
 
         InvertedIndex loadedIndex;
@@ -265,7 +343,7 @@ int main(int argc, char* argv[]) {
         auto searchStart =
             std::chrono::high_resolution_clock::now();
 
-        // Execute the complete query using QueryEvaluator
+        // Execute complete query
         std::vector<SearchResult> results =
             evaluator.evaluate(queryTree.get(), 10);
 

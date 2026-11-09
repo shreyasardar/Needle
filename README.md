@@ -51,3 +51,56 @@ Phrase search achieved approximately 17.1x and 10.7x faster execution, respectiv
 
 *Note: Results were measured on the same machine. Performance may vary depending on hardware and system load.*
 
+
+
+## Scalability Benchmarks
+
+Evaluated index construction performance using synthetic datasets of different sizes.
+
+### Dataset Scaling (8 Threads)
+
+Each measurement represents the average of multiple runs.
+
+| Documents | Average Indexing Time (seconds) | Throughput (docs/second) |
+|---:|---:|---:|
+| 100,000 | 1.694 | 59,018 |
+| 250,000 | 4.111 | 60,819 |
+| 500,000 | 8.239 | 60,683 |
+
+### Results
+
+- Indexed up to 500,000 documents.
+- Maintained an average throughput of approximately 60K documents per second.
+- Indexing time scales approximately linearly as dataset size increases.
+- Benchmarks include document loading, tokenization, indexing, merging and index saving.
+
+## Thread Scaling Benchmark (500K Documents)
+
+Compared indexing performance using different thread configurations.
+Each configuration was tested four times.
+
+| Threads | Average Indexing Time (seconds) |
+|---:|---:|
+| 4 | 9.514 |
+| 6 | 9.119 |
+| 8 | 8.239 |
+| 12 | 9.952 |
+
+### Results
+
+- Best tested configuration: 8 threads.
+- 8 threads achieved an average indexing time of 8.239 seconds.
+- 8 threads were approximately 13.4% faster than 4 threads.
+- Increasing the thread count to 12 did not improve performance.
+- Threading overhead and resource contention can affect performance.
+
+*Note: Benchmarks were conducted on a synthetic corpus using an Intel Core i5-13420H system running Ubuntu through WSL2. Results may vary depending on hardware and system load.*
+
+^X
+q
+
+
+
+
+
+
