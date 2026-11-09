@@ -3,6 +3,8 @@
 
 #include <unordered_map>
 #include <algorithm>
+#include <iterator>
+#include <utility>
 
 
 // Add a document to the inverted index
@@ -11,9 +13,9 @@ void InvertedIndex::addDocument(
     const std::vector<std::string>& tokens
 ) {
 
-    documentLengths[documentId] = tokens.size();
+    documentLengths[documentId] = static_cast<int>(tokens.size());
 
-    totalDocumentLength += tokens.size();
+    totalDocumentLength += static_cast<int>(tokens.size());
 
     totalDocuments++;
 
@@ -64,6 +66,12 @@ void InvertedIndex::loadData(
     documentFrequency = loadedDocumentFrequencies;
     totalDocuments = loadedTotalDocuments;
     averageDocumentLength = loadedAverageDocumentLength;
+
+    totalDocumentLength = 0;
+
+    for (const auto& entry : documentLengths) {
+        totalDocumentLength += entry.second;
+    }
 }
 
 
@@ -100,12 +108,13 @@ int InvertedIndex::getDocumentFrequency(
     const std::string& word
 ) const {
 
-    if (documentFrequency.find(word) ==
-        documentFrequency.end()) {
+    auto it = documentFrequency.find(word);
+
+    if (it == documentFrequency.end()) {
         return 0;
     }
 
-    return documentFrequency.at(word);
+    return it->second;
 }
 
 
@@ -139,15 +148,57 @@ InvertedIndex::getDocumentFrequencies() const {
 // Merge two inverted indexes
 void InvertedIndex::merge(const InvertedIndex& other) {
 
+    // Reserve capacity to reduce repeated hash-map rehashing
+    index.reserve(index.size() + other.index.size());
+
     // Merge posting lists
     for (const auto& entry : other.index) {
 
         const std::string& word = entry.first;
+        const std::vector<Posting>& otherPostings = entry.second;
 
-        for (const Posting& posting : entry.second) {
-            index[word].push_back(posting);
+        auto it = index.find(word);
+
+        // If the word does not exist, copy its posting list
+        if (it == index.end()) {
+
+            index.emplace(word, otherPostings);
+        }
+
+        // Otherwise, merge the two sorted posting lists
+        else {
+
+            std::vector<Posting> mergedPostings;
+
+            const std::vector<Posting>& currentPostings = it->second;
+
+            mergedPostings.reserve(
+                currentPostings.size() + otherPostings.size()
+            );
+
+            std::merge(
+                currentPostings.begin(),
+                currentPostings.end(),
+                otherPostings.begin(),
+                otherPostings.end(),
+                std::back_inserter(mergedPostings),
+                [](const Posting& a, const Posting& b) {
+                    return a.documentId < b.documentId;
+                }
+            );
+
+            it->second = std::move(mergedPostings);
         }
     }
+
+    // Reserve capacity for document metadata
+    documentLengths.reserve(
+        documentLengths.size() + other.documentLengths.size()
+    );
+
+    documentFrequency.reserve(
+        documentFrequency.size() + other.documentFrequency.size()
+    );
 
     // Merge document lengths
     for (const auto& entry : other.documentLengths) {
@@ -168,17 +219,5 @@ void InvertedIndex::merge(const InvertedIndex& other) {
         averageDocumentLength =
             static_cast<double>(totalDocumentLength) /
             totalDocuments;
-    }
-
-    // Sort every posting list by document ID
-    for (auto& entry : index) {
-
-        std::sort(
-            entry.second.begin(),
-            entry.second.end(),
-            [](const Posting& a, const Posting& b) {
-                return a.documentId < b.documentId;
-            }
-        );
     }
 }
