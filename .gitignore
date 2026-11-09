@@ -22,3 +22,13 @@ data/benchmark/
 
 # Generated search index
 index.txt
+
+
+# Debug build
+build-debug/
+
+# Valgrind profiling output
+massif*.out
+
+# Generated test files
+test_index.txt

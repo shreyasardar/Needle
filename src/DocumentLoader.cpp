@@ -3,6 +3,7 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
+#include <utility>
 
 std::vector<Document> DocumentLoader::load(const std::string& filename) {
 
@@ -35,7 +36,7 @@ std::vector<Document> DocumentLoader::load(const std::string& filename) {
         doc.title = title;
         doc.text = text;
 
-        documents.push_back(doc);
+        documents.push_back(std::move(doc));
     }
 
     return documents;

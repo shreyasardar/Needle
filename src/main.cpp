@@ -155,7 +155,12 @@ int main(int argc, char* argv[]) {
         // Save final index
         IndexWriter writer;
 
-        writer.save(index, "index.txt");
+if (!writer.save(index, "index.txt")) {
+    std::cerr << "Error: Failed to save the index.\n";
+    return 1;
+}
+
+std::cout << "Index saved successfully.\n";
 
 
         // Stop timer
@@ -211,12 +216,16 @@ int main(int argc, char* argv[]) {
 
         std::cout << "Interactive search mode selected.\n";
 
-        InvertedIndex loadedIndex;
+       InvertedIndex loadedIndex;
+IndexReader reader;
 
-        IndexReader reader;
-        reader.load(loadedIndex, "index.txt");
+if (!reader.load(loadedIndex, "index.txt")) {
+    std::cerr << "Error: Failed to load the index. "
+              << "Please build the index first.\n";
+    return 1;
+}
 
-        BM25 bm25(loadedIndex);
+BM25 bm25(loadedIndex);
 
         QueryParser parser;
         QueryEvaluator evaluator(bm25);
@@ -315,17 +324,17 @@ int main(int argc, char* argv[]) {
         // Build Abstract Syntax Tree
         auto queryTree = parser.parse(query);
 
-        InvertedIndex loadedIndex;
+   InvertedIndex loadedIndex;
+IndexReader reader;
 
-        IndexReader reader;
+auto loadStart = std::chrono::high_resolution_clock::now();
 
-        auto loadStart =
-            std::chrono::high_resolution_clock::now();
+if (!reader.load(loadedIndex, "index.txt")) {
+    std::cerr << "Error: Failed to load the index.\n";
+    return 1;
+}
 
-        reader.load(loadedIndex, "index.txt");
-
-        auto loadEnd =
-            std::chrono::high_resolution_clock::now();
+auto loadEnd = std::chrono::high_resolution_clock::now();    std::chrono::high_resolution_clock::now();
 
         double loadTime =
             std::chrono::duration<double, std::milli>(

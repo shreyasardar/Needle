@@ -1,33 +1,59 @@
-
 #include "InvertedIndex.h"
 
 #include <unordered_map>
 #include <algorithm>
 #include <iterator>
 #include <utility>
+#include <limits>
 
 
 // Add a document to the inverted index
-void InvertedIndex::addDocument(
+bool InvertedIndex::addDocument(
     int documentId,
     const std::vector<std::string>& tokens
 ) {
 
-    documentLengths[documentId] = static_cast<int>(tokens.size());
+    // Reject negative document IDs.
+    if (documentId < 0) {
+        return false;
+    }
 
-    totalDocumentLength += static_cast<int>(tokens.size());
+    // Reject duplicate document IDs.
+    if (documentLengths.find(documentId) != documentLengths.end()) {
+        return false;
+    }
 
-    totalDocuments++;
+    // Prevent document length overflow.
+    if (tokens.size() >
+        static_cast<size_t>(std::numeric_limits<int>::max())) {
+        return false;
+    }
 
-    averageDocumentLength =
-        static_cast<double>(totalDocumentLength) /
-        documentLengths.size();
+    // Prevent total document count overflow.
+    if (totalDocuments == std::numeric_limits<int>::max()) {
+        return false;
+    }
 
+    int documentLength = static_cast<int>(tokens.size());
 
+    // Prevent total document length overflow.
+    if (documentLength >
+        std::numeric_limits<int>::max() - totalDocumentLength) {
+        return false;
+    }
+
+    // Reject empty terms.
+    for (const std::string& token : tokens) {
+        if (token.empty()) {
+            return false;
+        }
+    }
+
+    // Calculate term frequencies and positions.
     std::unordered_map<std::string, int> termFrequency;
     std::unordered_map<std::string, std::vector<int>> positions;
 
-    for (int i = 0; i < static_cast<int>(tokens.size()); i++) {
+    for (int i = 0; i < documentLength; i++) {
 
         const std::string& token = tokens[i];
 
@@ -35,6 +61,18 @@ void InvertedIndex::addDocument(
         positions[token].push_back(i);
     }
 
+    // Update document metadata.
+    documentLengths[documentId] = documentLength;
+
+    totalDocumentLength += documentLength;
+
+    totalDocuments++;
+
+    averageDocumentLength =
+        static_cast<double>(totalDocumentLength) /
+        totalDocuments;
+
+    // Update inverted index and document frequencies.
     for (const auto& entry : termFrequency) {
 
         const std::string& word = entry.first;
@@ -45,10 +83,11 @@ void InvertedIndex::addDocument(
         Posting posting;
         posting.documentId = documentId;
         posting.termFrequency = frequency;
-        posting.positions = positions[word];
-
-        index[word].push_back(posting);
+        posting.positions = std::move(positions[word]);
+index[word].push_back(std::move(posting));
     }
+
+    return true;
 }
 
 
@@ -146,41 +185,41 @@ InvertedIndex::getDocumentFrequencies() const {
 
 
 // Merge two inverted indexes
-void InvertedIndex::merge(const InvertedIndex& other) {
+// Merge two inverted indexes
+void InvertedIndex::merge(InvertedIndex& other) {
 
-    // Reserve capacity to reduce repeated hash-map rehashing
+    // Reserve capacity to reduce hash-map rehashing.
     index.reserve(index.size() + other.index.size());
 
-    // Merge posting lists
-    for (const auto& entry : other.index) {
+    // Merge posting lists.
+    for (auto& entry : other.index) {
 
         const std::string& word = entry.first;
-        const std::vector<Posting>& otherPostings = entry.second;
+        std::vector<Posting>& otherPostings = entry.second;
 
         auto it = index.find(word);
 
-        // If the word does not exist, copy its posting list
+        // If the word does not exist, transfer its posting list.
         if (it == index.end()) {
-
-            index.emplace(word, otherPostings);
+            index.emplace(word, std::move(otherPostings));
         }
 
-        // Otherwise, merge the two sorted posting lists
         else {
 
-            std::vector<Posting> mergedPostings;
+            std::vector<Posting>& currentPostings = it->second;
 
-            const std::vector<Posting>& currentPostings = it->second;
+            std::vector<Posting> mergedPostings;
 
             mergedPostings.reserve(
                 currentPostings.size() + otherPostings.size()
             );
 
+            // Merge by moving postings instead of copying them.
             std::merge(
-                currentPostings.begin(),
-                currentPostings.end(),
-                otherPostings.begin(),
-                otherPostings.end(),
+                std::make_move_iterator(currentPostings.begin()),
+                std::make_move_iterator(currentPostings.end()),
+                std::make_move_iterator(otherPostings.begin()),
+                std::make_move_iterator(otherPostings.end()),
                 std::back_inserter(mergedPostings),
                 [](const Posting& a, const Posting& b) {
                     return a.documentId < b.documentId;
@@ -191,7 +230,7 @@ void InvertedIndex::merge(const InvertedIndex& other) {
         }
     }
 
-    // Reserve capacity for document metadata
+    // Reserve capacity for document metadata.
     documentLengths.reserve(
         documentLengths.size() + other.documentLengths.size()
     );
@@ -200,22 +239,21 @@ void InvertedIndex::merge(const InvertedIndex& other) {
         documentFrequency.size() + other.documentFrequency.size()
     );
 
-    // Merge document lengths
+    // Merge document lengths.
     for (const auto& entry : other.documentLengths) {
         documentLengths[entry.first] = entry.second;
     }
 
-    // Merge document frequencies
+    // Merge document frequencies.
     for (const auto& entry : other.documentFrequency) {
         documentFrequency[entry.first] += entry.second;
     }
 
-    // Update document statistics
+    // Update document statistics.
     totalDocuments += other.totalDocuments;
     totalDocumentLength += other.totalDocumentLength;
 
     if (totalDocuments > 0) {
-
         averageDocumentLength =
             static_cast<double>(totalDocumentLength) /
             totalDocuments;

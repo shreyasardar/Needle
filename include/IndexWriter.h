@@ -1,3 +1,4 @@
+
 #pragma once
 
 #include <string>
@@ -5,7 +6,7 @@
 
 class IndexWriter {
 public:
-    void save(
+    bool save(
         const InvertedIndex& index,
         const std::string& filename
     );

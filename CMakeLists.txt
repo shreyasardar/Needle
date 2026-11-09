@@ -25,6 +25,8 @@ add_executable(needle_test
     src/Tokenizer.cpp
     src/InvertedIndex.cpp
     src/BM25.cpp
+    src/IndexWriter.cpp
+    src/IndexReader.cpp
     src/QueryParser.cpp
     src/QueryEvaluator.cpp
 )

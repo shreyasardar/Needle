@@ -4,12 +4,17 @@
 #include <string>
 #include <cassert>
 #include <algorithm>
+#include <cmath>
+#include <fstream>
+#include <cstdio>
 
 #include "Tokenizer.h"
 #include "InvertedIndex.h"
 #include "BM25.h"
 #include "QueryParser.h"
 #include "QueryEvaluator.h"
+#include "IndexWriter.h"
+#include "IndexReader.h"
 
 int main() {
 
@@ -539,6 +544,337 @@ if (actualIds != expectedIds) {
 }
 
     std::cout << "Phrase OR test: PASS\n";
+
+
+    // Test 30: Search for a nonexistent term
+std::vector<SearchResult> missingResults =
+    bm25.search("quantum", 10);
+
+if (!missingResults.empty()) {
+    std::cout << "Nonexistent term test: FAIL\n";
+    return 1;
+}
+
+std::cout << "Nonexistent term test: PASS\n";
+
+
+// Test 31: Search an empty index
+InvertedIndex emptyIndex;
+BM25 emptyBM25(emptyIndex);
+
+std::vector<SearchResult> emptyIndexResults =
+    emptyBM25.search("computer", 10);
+
+if (!emptyIndexResults.empty()) {
+    std::cout << "Empty index test: FAIL\n";
+    return 1;
+}
+
+std::cout << "Empty index test: PASS\n";
+
+
+// Test 32: Top-K with zero limit
+std::vector<SearchResult> zeroTopKResults =
+    bm25.getTopK(results, 0);
+
+if (!zeroTopKResults.empty()) {
+    std::cout << "Zero Top-K test: FAIL\n";
+    return 1;
+}
+
+std::cout << "Zero Top-K test: PASS\n";
+
+
+
+// Test 33: Reject non-consecutive phrase matches
+
+InvertedIndex nonConsecutiveIndex;
+
+nonConsecutiveIndex.addDocument(
+    1,
+    {"machine", "deep", "learning"}
+);
+
+BM25 nonConsecutiveBM25(nonConsecutiveIndex);
+
+std::vector<std::string> nonConsecutivePhrase = {
+    "machine", "learning"
+};
+
+std::vector<SearchResult> nonConsecutiveResults =
+    nonConsecutiveBM25.searchPhrase(nonConsecutivePhrase, 10);
+
+if (!nonConsecutiveResults.empty()) {
+    std::cout << "Non-consecutive phrase test: FAIL\n";
+    return 1;
+}
+
+std::cout << "Non-consecutive phrase test: PASS\n";
+
+
+// Test 34: Index persistence (save and load)
+
+InvertedIndex persistenceIndex;
+
+persistenceIndex.addDocument(
+    1,
+    {"machine", "learning", "systems"}
+);
+
+persistenceIndex.addDocument(
+    2,
+    {"computer", "networks"}
+);
+
+// Save the index
+IndexWriter indexWriter;
+indexWriter.save(persistenceIndex, "test_index.txt");
+
+// Load the index
+InvertedIndex loadedIndex;
+IndexReader indexReader;
+indexReader.load(loadedIndex, "test_index.txt");
+
+// Verify document count
+if (loadedIndex.getTotalDocuments() != 2) {
+    std::cout << "Persistence test: FAIL\n";
+    return 1;
+}
+
+// Verify search after loading
+BM25 loadedBM25(loadedIndex);
+
+auto loadedResults = loadedBM25.search("machine", 10);
+
+if (loadedResults.size() != 1 ||
+    loadedResults[0].documentId != 1) {
+    std::cout << "Persistence test: FAIL\n";
+    return 1;
+}
+
+std::cout << "Persistence test: PASS\n";
+
+
+    // Test 35: Document frequency survives save/load
+    if (loadedIndex.getDocumentFrequency("machine") != 1) {
+        std::cout << "Persistence document frequency test: FAIL\n";
+        return 1;
+    }
+    std::cout << "Persistence document frequency test: PASS\n";
+
+    // Test 36: Document length survives save/load
+    if (loadedIndex.getDocumentLength(1) != 3) {
+        std::cout << "Persistence document length test: FAIL\n";
+        return 1;
+    }
+    std::cout << "Persistence document length test: PASS\n";
+
+    // Test 37: Multiple documents survive save/load
+    if (loadedIndex.getDocumentLength(2) != 2 ||
+        loadedIndex.getTotalDocuments() != 2) {
+        std::cout << "Multiple documents persistence test: FAIL\n";
+        return 1;
+    }
+    std::cout << "Multiple documents persistence test: PASS\n";
+
+    // Test 38: Search results remain consistent after save/load
+    auto originalResults = BM25(persistenceIndex).search("machine", 10);
+    auto restoredResults = loadedBM25.search("machine", 10);
+
+    if (originalResults.size() != restoredResults.size() ||
+        originalResults[0].documentId != restoredResults[0].documentId ||
+        std::abs(originalResults[0].score -
+                 restoredResults[0].score) > 1e-9) {
+        std::cout << "Search consistency persistence test: FAIL\n";
+        return 1;
+    }
+    std::cout << "Search consistency persistence test: PASS\n";
+
+    // Test 39: Phrase search works after loading
+    std::vector<std::string> restoredPhrase = {
+        "machine", "learning"
+    };
+
+    auto restoredPhraseResults =
+        loadedBM25.searchPhrase(restoredPhrase, 10);
+
+    if (restoredPhraseResults.size() != 1 ||
+        restoredPhraseResults[0].documentId != 1) {
+        std::cout << "Phrase persistence test: FAIL\n";
+        return 1;
+    }
+    std::cout << "Phrase persistence test: PASS\n";
+
+    // Test 40: Missing term after loading
+    auto restoredMissingResults =
+        loadedBM25.search("quantum", 10);
+
+    if (!restoredMissingResults.empty()) {
+        std::cout << "Missing term persistence test: FAIL\n";
+        return 1;
+    }
+    std::cout << "Missing term persistence test: PASS\n";
+
+    // Test 41: Loading a nonexistent file
+InvertedIndex missingFileIndex;
+IndexReader missingFileReader;
+
+if (missingFileReader.load(
+        missingFileIndex,
+        "file_that_does_not_exist.txt")) {
+    std::cout << "Missing file test: FAIL\n";
+    return 1;
+}
+std::cout << "Missing file test: PASS\n";
+
+// Test 42: Reject corrupted index file
+{
+    std::ofstream corruptFile("corrupt_index.txt");
+    corruptFile << "machine invalid_posting_data\n";
+}
+
+InvertedIndex corruptIndex;
+IndexReader corruptReader;
+
+if (corruptReader.load(corruptIndex, "corrupt_index.txt")) {
+    std::cout << "Corrupted index test: FAIL\n";
+    return 1;
+}
+std::cout << "Corrupted index test: PASS\n";
+
+// Test 43: Failed load must not overwrite existing index
+InvertedIndex protectedIndex;
+protectedIndex.addDocument(99, {"protected", "document"});
+
+if (corruptReader.load(protectedIndex, "corrupt_index.txt")) {
+    std::cout << "Failed load protection test: FAIL\n";
+    return 1;
+}
+
+if (protectedIndex.getTotalDocuments() != 1 ||
+    protectedIndex.getDocumentFrequency("protected") != 1) {
+    std::cout << "Failed load protection test: FAIL\n";
+    return 1;
+}
+std::cout << "Failed load protection test: PASS\n";
+
+// Test 44: Detect failed save
+IndexWriter failedWriter;
+
+if (failedWriter.save(protectedIndex, ".")) {
+    std::cout << "Failed save test: FAIL\n";
+    return 1;
+}
+std::cout << "Failed save test: PASS\n";
+
+// Test 45: Reject malformed posting data
+{
+    std::ofstream malformedFile("malformed_index.txt");
+
+    malformedFile
+        << "machine 1:2:0,\n"
+        << "\nDOCUMENT_LENGTHS\n"
+        << "1 2\n"
+        << "\nDOCUMENT_FREQUENCIES\n"
+        << "machine 1\n"
+        << "\nTOTAL_DOCUMENTS\n"
+        << "1\n"
+        << "\nAVERAGE_DOCUMENT_LENGTH\n"
+        << "2\n";
+}
+
+InvertedIndex malformedIndex;
+IndexReader malformedReader;
+
+if (malformedReader.load(malformedIndex, "malformed_index.txt")) {
+    std::cout << "Malformed posting test: FAIL\n";
+    return 1;
+}
+std::cout << "Malformed posting test: PASS\n";
+
+// Clean up temporary test files
+std::remove("corrupt_index.txt");
+std::remove("malformed_index.txt");
+
+
+// Test 46: Duplicate document ID must be rejected
+
+InvertedIndex duplicateIndex;
+
+duplicateIndex.addDocument(1, {"machine", "learning"});
+
+// Attempt to add another document with the same ID.
+duplicateIndex.addDocument(1, {"computer", "science"});
+
+if (duplicateIndex.getTotalDocuments() != 1 ||
+    duplicateIndex.getDocumentLength(1) != 2 ||
+    duplicateIndex.getDocumentFrequency("machine") != 1 ||
+    duplicateIndex.getDocumentFrequency("computer") != 0) {
+
+    std::cout << "Duplicate document ID test: FAIL\n";
+    return 1;
+}
+
+if (!duplicateIndex.search("machine").empty() &&
+    duplicateIndex.search("computer").empty()) {
+
+    std::cout << "Duplicate document ID test: PASS\n";
+} else {
+    std::cout << "Duplicate document ID test: FAIL\n";
+    return 1;
+}
+
+
+// Test 47: Reject negative document ID
+InvertedIndex negativeIdIndex;
+
+if (negativeIdIndex.addDocument(-1, {"machine", "learning"}) ||
+    negativeIdIndex.getTotalDocuments() != 0) {
+    std::cout << "Negative document ID test: FAIL\n";
+    return 1;
+}
+std::cout << "Negative document ID test: PASS\n";
+
+
+// Test 48: Reject empty tokens
+InvertedIndex emptyTokenIndex;
+
+if (emptyTokenIndex.addDocument(1, {"machine", "", "learning"}) ||
+    emptyTokenIndex.getTotalDocuments() != 0) {
+    std::cout << "Empty token test: FAIL\n";
+    return 1;
+}
+std::cout << "Empty token test: PASS\n";
+
+
+// Test 49: Accept an empty document
+InvertedIndex emptyDocumentIndex;
+
+if (!emptyDocumentIndex.addDocument(1, {}) ||
+    emptyDocumentIndex.getTotalDocuments() != 1 ||
+    emptyDocumentIndex.getDocumentLength(1) != 0) {
+    std::cout << "Empty document test: FAIL\n";
+    return 1;
+}
+std::cout << "Empty document test: PASS\n";
+
+
+// Test 50: Duplicate document ID returns false
+InvertedIndex duplicateReturnIndex;
+
+bool firstInsert =
+    duplicateReturnIndex.addDocument(1, {"machine", "learning"});
+
+bool secondInsert =
+    duplicateReturnIndex.addDocument(1, {"computer", "science"});
+
+if (!firstInsert || secondInsert ||
+    duplicateReturnIndex.getTotalDocuments() != 1) {
+    std::cout << "Duplicate return value test: FAIL\n";
+    return 1;
+}
+std::cout << "Duplicate return value test: PASS\n";
+
 
 
 

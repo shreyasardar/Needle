@@ -5,7 +5,7 @@
 
 class IndexReader {
 public:
-    void load(
+    bool load(
         InvertedIndex& index,
         const std::string& filename
     );
