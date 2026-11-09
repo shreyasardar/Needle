@@ -2,9 +2,8 @@
 #include "QueryEvaluator.h"
 
 #include <algorithm>
-#include <unordered_map>
-#include <string>
 #include <limits>
+#include <string>
 
 #include "Tokenizer.h"
 
@@ -25,12 +24,11 @@ std::vector<SearchResult> QueryEvaluator::evaluate(
         return {};
     }
 
-    // Use a very large K for intermediate searches
-    // so that no matching documents are discarded.
+    // Keep all intermediate results.
+    // Apply Top-K only after evaluating the complete query.
     std::vector<SearchResult> allResults =
         evaluateNode(root, std::numeric_limits<int>::max());
 
-    // Apply Top-K only once, after evaluating the full query.
     return bm25.getTopK(allResults, k);
 }
 
@@ -50,14 +48,14 @@ std::vector<SearchResult> QueryEvaluator::evaluateNode(
 
         std::string term = node->term;
 
+        Tokenizer tokenizer;
+
         // Check whether this is a quoted phrase
         if (term.size() >= 2 &&
             term.front() == '"' &&
             term.back() == '"') {
 
             term = term.substr(1, term.size() - 2);
-
-            Tokenizer tokenizer;
 
             std::vector<std::string> words =
                 tokenizer.tokenize(term);
@@ -66,12 +64,10 @@ std::vector<SearchResult> QueryEvaluator::evaluateNode(
                 return {};
             }
 
-            return bm25.searchPhrase(words, k);
+            return bm25.searchPhraseByDocumentId(words);
         }
 
         // Normal term search
-        Tokenizer tokenizer;
-
         std::vector<std::string> words =
             tokenizer.tokenize(term);
 
@@ -79,11 +75,12 @@ std::vector<SearchResult> QueryEvaluator::evaluateNode(
             return {};
         }
 
-        return bm25.search(words[0], k);
+        return bm25.searchByDocumentId(words[0]);
     }
 
 
-    // Evaluate left and right subtrees
+    // Evaluate left and right subtrees.
+    // Both return results sorted by document ID.
     std::vector<SearchResult> leftResults =
         evaluateNode(node->left.get(), k);
 
@@ -91,38 +88,17 @@ std::vector<SearchResult> QueryEvaluator::evaluateNode(
         evaluateNode(node->right.get(), k);
 
 
-    // Store document IDs and their scores
-    std::unordered_map<int, double> scores;
+    std::vector<SearchResult> combinedResults;
+
+    size_t i = 0;
+    size_t j = 0;
 
 
     // CASE 2: AND operation
-  
-    // CASE 2: AND operation using two-pointer intersection
     if (node->type == QueryNodeType::AND) {
 
-        // Sort both result lists by document ID
-        std::sort(
-            leftResults.begin(),
-            leftResults.end(),
-            [](const SearchResult& a, const SearchResult& b) {
-                return a.documentId < b.documentId;
-            }
-        );
-
-        std::sort(
-            rightResults.begin(),
-            rightResults.end(),
-            [](const SearchResult& a, const SearchResult& b) {
-                return a.documentId < b.documentId;
-            }
-        );
-
-        std::vector<SearchResult> combinedResults;
-
-        size_t i = 0;
-        size_t j = 0;
-
-        // Find common document IDs
+        // Two-pointer intersection.
+        // Only documents present in both lists are retained.
         while (i < leftResults.size() &&
                j < rightResults.size()) {
 
@@ -137,11 +113,13 @@ std::vector<SearchResult> QueryEvaluator::evaluateNode(
                 i++;
                 j++;
             }
+
             else if (leftResults[i].documentId <
                      rightResults[j].documentId) {
 
                 i++;
             }
+
             else {
                 j++;
             }
@@ -151,36 +129,11 @@ std::vector<SearchResult> QueryEvaluator::evaluateNode(
     }
 
 
-
     // CASE 3: OR operation
-    
-    // CASE 3: OR operation using sorted merge
-
     else if (node->type == QueryNodeType::OR) {
 
-        // Sort both result lists by document ID
-        std::sort(
-            leftResults.begin(),
-            leftResults.end(),
-            [](const SearchResult& a, const SearchResult& b) {
-                return a.documentId < b.documentId;
-            }
-        );
-
-        std::sort(
-            rightResults.begin(),
-            rightResults.end(),
-            [](const SearchResult& a, const SearchResult& b) {
-                return a.documentId < b.documentId;
-            }
-        );
-
-        std::vector<SearchResult> combinedResults;
-
-        size_t i = 0;
-        size_t j = 0;
-
-        // Merge both lists
+        // Two-pointer merge.
+        // Documents from both lists are retained.
         while (i < leftResults.size() &&
                j < rightResults.size()) {
 
@@ -195,12 +148,14 @@ std::vector<SearchResult> QueryEvaluator::evaluateNode(
                 i++;
                 j++;
             }
+
             else if (leftResults[i].documentId <
                      rightResults[j].documentId) {
 
                 combinedResults.push_back(leftResults[i]);
                 i++;
             }
+
             else {
 
                 combinedResults.push_back(rightResults[j]);
@@ -224,21 +179,5 @@ std::vector<SearchResult> QueryEvaluator::evaluateNode(
     }
 
 
-
-    // Convert scores into SearchResult objects
-    std::vector<SearchResult> combinedResults;
-
-    for (const auto& entry : scores) {
-
-        combinedResults.push_back({
-            entry.first,
-            entry.second
-        });
-    }
-
-    // IMPORTANT:
-    // Do not apply Top-K here.
-    // The parent node may need documents outside the top K.
-
-    return combinedResults;
+    return {};
 }

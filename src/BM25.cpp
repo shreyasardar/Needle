@@ -352,6 +352,144 @@ std::vector<SearchResult> BM25::searchPhrase(
 }
 
 
+
+
+// Search a word and return results sorted by document ID
+std::vector<SearchResult> BM25::searchByDocumentId(
+    const std::string& word
+) {
+    std::vector<SearchResult> results;
+
+    const std::vector<Posting>& postings =
+        index.search(word);
+
+    double idf = calculateIDF(word);
+
+    for (const Posting& posting : postings) {
+
+        double score = calculateScore(
+            idf,
+            posting.documentId,
+            posting.termFrequency
+        );
+
+        results.push_back({
+            posting.documentId,
+            score
+        });
+    }
+
+    // Posting lists are already sorted by document ID.
+    return results;
+}
+
+
+// Search a phrase and return results sorted by document ID
+std::vector<SearchResult> BM25::searchPhraseByDocumentId(
+    const std::vector<std::string>& words
+) {
+    if (words.empty()) {
+        return {};
+    }
+
+    std::vector<
+        std::unordered_map<int, const Posting*>
+    > postingMaps;
+
+    std::vector<double> idfs;
+
+    // Build document lookup maps and cache IDF values.
+    for (const std::string& word : words) {
+
+        const std::vector<Posting>& postings =
+            index.search(word);
+
+        std::unordered_map<int, const Posting*> documentMap;
+
+        for (const Posting& posting : postings) {
+            documentMap[posting.documentId] = &posting;
+        }
+
+        postingMaps.push_back(std::move(documentMap));
+        idfs.push_back(calculateIDF(word));
+    }
+
+    std::vector<SearchResult> results;
+
+    const std::vector<Posting>& firstPostings =
+        index.search(words[0]);
+
+    for (const Posting& firstPosting : firstPostings) {
+
+        int documentId = firstPosting.documentId;
+
+        bool phraseFound = false;
+
+        for (int startPosition : firstPosting.positions) {
+
+            bool matches = true;
+
+            for (size_t i = 1; i < words.size(); i++) {
+
+                auto it = postingMaps[i].find(documentId);
+
+                if (it == postingMaps[i].end()) {
+                    matches = false;
+                    break;
+                }
+
+                int requiredPosition =
+                    startPosition + static_cast<int>(i);
+
+                const std::vector<int>& positions =
+                    it->second->positions;
+
+                if (!std::binary_search(
+                        positions.begin(),
+                        positions.end(),
+                        requiredPosition)) {
+
+                    matches = false;
+                    break;
+                }
+            }
+
+            if (matches) {
+                phraseFound = true;
+                break;
+            }
+        }
+
+        if (!phraseFound) {
+            continue;
+        }
+
+        double score = 0.0;
+
+        for (size_t i = 0; i < words.size(); i++) {
+
+            const Posting* posting =
+                postingMaps[i].at(documentId);
+
+            score += calculateScore(
+                idfs[i],
+                documentId,
+                posting->termFrequency
+            );
+        }
+
+        results.push_back({
+            documentId,
+            score
+        });
+    }
+
+    // Results inherit document-ID order from firstPostings.
+    return results;
+}
+
+
+
 // Get the best K results
 std::vector<SearchResult> BM25::getTopK(
     const std::vector<SearchResult>& results,

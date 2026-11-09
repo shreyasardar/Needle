@@ -1,8 +1,11 @@
+
 #include "IndexReader.h"
+
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <unordered_map>
+#include <algorithm>
 
 void IndexReader::load(
     InvertedIndex& index,
@@ -15,13 +18,19 @@ void IndexReader::load(
                   << filename << '\n';
         return;
     }
-       int totalDocuments = 0;
-       double averageDocumentLength = 0.0;
-       std::unordered_map<int, int> documentLengths;
-       std::unordered_map<std::string, int> documentFrequencies;
-       std::unordered_map<std::string, std::vector<Posting>> loadedIndex;
 
-        std::string line;
+    int totalDocuments = 0;
+    double averageDocumentLength = 0.0;
+
+    std::unordered_map<int, int> documentLengths;
+
+    std::unordered_map<std::string, int>
+        documentFrequencies;
+
+    std::unordered_map<std::string, std::vector<Posting>>
+        loadedIndex;
+
+    std::string line;
     std::string section = "INDEX";
 
     while (std::getline(file, line)) {
@@ -50,115 +59,142 @@ void IndexReader::load(
             continue;
         }
 
-        // We will parse each section here.
 
+        // Read total documents
         if (section == "TOTAL_DOCUMENTS") {
-    std::stringstream ss(line);
-    ss >> totalDocuments;
-    continue;
-}
+
+            std::stringstream ss(line);
+            ss >> totalDocuments;
+
+            continue;
+        }
 
 
-if (section == "AVERAGE_DOCUMENT_LENGTH") {
-    std::stringstream ss(line);
-    ss >> averageDocumentLength;
-    continue;
-}
+        // Read average document length
+        if (section == "AVERAGE_DOCUMENT_LENGTH") {
 
-if (section == "DOCUMENT_LENGTHS") {
-    std::stringstream ss(line);
+            std::stringstream ss(line);
+            ss >> averageDocumentLength;
 
-    int documentId;
-    int documentLength;
+            continue;
+        }
 
-    ss >> documentId >> documentLength;
 
-    documentLengths[documentId] = documentLength;
+        // Read document lengths
+        if (section == "DOCUMENT_LENGTHS") {
 
-    continue;
-}
+            std::stringstream ss(line);
 
-if (section == "DOCUMENT_FREQUENCIES") {
-    std::stringstream ss(line);
+            int documentId;
+            int documentLength;
 
-    std::string word;
-    int frequency;
+            ss >> documentId >> documentLength;
 
-    ss >> word >> frequency;
+            documentLengths[documentId] = documentLength;
 
-    documentFrequencies[word] = frequency;
+            continue;
+        }
 
-    continue;
-}
 
-if (section == "INDEX") {
-    std::stringstream ss(line);
+        // Read document frequencies
+        if (section == "DOCUMENT_FREQUENCIES") {
 
-    std::string word;
-    ss >> word;
+            std::stringstream ss(line);
 
-    std::string postingData;
+            std::string word;
+            int frequency;
 
-   while (ss >> postingData) {
+            ss >> word >> frequency;
 
-    size_t firstColon =
-        postingData.find(':');
+            documentFrequencies[word] = frequency;
 
-    size_t secondColon =
-        postingData.find(':', firstColon + 1);
+            continue;
+        }
 
-    int documentId =
-        std::stoi(
-            postingData.substr(
-                0,
-                firstColon
-            )
-        );
 
-    int termFrequency =
-        std::stoi(
-            postingData.substr(
-                firstColon + 1,
-                secondColon - firstColon - 1
-            )
-        );
+        // Read inverted index
+        if (section == "INDEX") {
 
-    Posting posting;
-    posting.documentId = documentId;
-    posting.termFrequency = termFrequency;
+            std::stringstream ss(line);
 
-    std::string positionData =
-        postingData.substr(secondColon + 1);
+            std::string word;
+            ss >> word;
 
-    std::stringstream positionStream(
-        positionData
-    );
+            std::string postingData;
 
-    std::string position;
+            while (ss >> postingData) {
 
-    while (std::getline(
-        positionStream,
-        position,
-        ','
-    )) {
-        if (!position.empty()) {
-            posting.positions.push_back(
-                std::stoi(position)
-            );
+                size_t firstColon =
+                    postingData.find(':');
+
+                size_t secondColon =
+                    postingData.find(':', firstColon + 1);
+
+                int documentId =
+                    std::stoi(
+                        postingData.substr(0, firstColon)
+                    );
+
+                int termFrequency =
+                    std::stoi(
+                        postingData.substr(
+                            firstColon + 1,
+                            secondColon - firstColon - 1
+                        )
+                    );
+
+                Posting posting;
+
+                posting.documentId = documentId;
+                posting.termFrequency = termFrequency;
+
+                std::string positionData =
+                    postingData.substr(secondColon + 1);
+
+                std::stringstream positionStream(positionData);
+
+                std::string position;
+
+                while (std::getline(
+                    positionStream,
+                    position,
+                    ','
+                )) {
+
+                    if (!position.empty()) {
+                        posting.positions.push_back(
+                            std::stoi(position)
+                        );
+                    }
+                }
+
+                loadedIndex[word].push_back(posting);
+            }
+
+            continue;
         }
     }
 
-    loadedIndex[word].push_back(posting);
-}
 
-    continue;
-}
+    // Sort every posting list by document ID
+    for (auto& entry : loadedIndex) {
+
+        std::sort(
+            entry.second.begin(),
+            entry.second.end(),
+            [](const Posting& a, const Posting& b) {
+                return a.documentId < b.documentId;
+            }
+        );
     }
+
+
+    // Load sorted index data
     index.loadData(
-    loadedIndex,
-    documentLengths,
-    documentFrequencies,
-    totalDocuments,
-    averageDocumentLength
-);
+        loadedIndex,
+        documentLengths,
+        documentFrequencies,
+        totalDocuments,
+        averageDocumentLength
+    );
 }
